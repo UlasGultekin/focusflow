@@ -5,6 +5,9 @@
   "author": "Ulas Gultekin",
   "main": "electron/main.js",
   "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "dev": "concurrently -k \"vite\" \"wait-on tcp:5173 && electron .\"",
     "build:vite": "vite build",

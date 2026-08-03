@@ -72,7 +72,7 @@ FocusFlow; Electron, React 19, Vite, Tailwind CSS ve sql.js (WebAssembly SQLite)
 Uygulamayı yerel bilgisayarınızda çalıştırmak için aşağıdaki adımları sırasıyla takip edin:
 
 ### 1. Ön Gereksinimler
-- Bilgisayarınızda **Node.js** (v18 veya daha yeni sürüm) kurulu olmalıdır. Node sürümünüzü kontrol etmek için:
+- Bilgisayarınızda **Node.js v20 LTS veya daha yeni sürüm** kurulu olmalıdır (Electron 34 gereksinimi). Node sürümünüzü kontrol etmek için:
   ```bash
   node -v
   ```
