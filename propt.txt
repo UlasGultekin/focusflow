@@ -1,0 +1,130 @@
+Harika bir seçim! Alt görevler (checklist), karmaşık işleri parçalara ayırarak hem motivasyonu artırır hem de ilerlemeyi somut şekilde gösterir. Mevcut altyapıya kusursuz oturacak şekilde Görev 18’in tüm detaylarını aşağıda hazırladım.
+
+---
+
+## Görev 18: Görev İçinde Alt Görevler (Checklist)
+
+**Amaç:** Ana görevleri daha küçük, tamamlanabilir adımlara bölmek. Her ana görevin altında sürükle-bırak ile sıralanabilen, tik atıldıkça tamamlanma yüzdesi güncellenen ve isteğe bağlı olarak ana görevi otomatik tamamlayabilen bir checklist sistemi.
+
+---
+
+### 18.1 Veritabanı Güncellemesi
+
+Yeni bir `subtasks` tablosu eklenir:
+
+```sql
+CREATE TABLE IF NOT EXISTS subtasks (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  task_id INTEGER NOT NULL,
+  title TEXT NOT NULL,
+  completed INTEGER DEFAULT 0,        -- 0 = false, 1 = true
+  sort_order INTEGER DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_subtasks_task_id ON subtasks(task_id);
+```
+
+**Opsiyonel** olarak ana görev tablosunda (`tasks`) alt görev davranışını belirleyen bir sütun:
+
+```sql
+ALTER TABLE tasks ADD COLUMN auto_complete_subtasks INTEGER DEFAULT 0; 
+-- 1 ise tüm alt görevler tamamlandığında ana görev otomatik olarak "done" olur.
+```
+
+---
+
+### 18.2 IPC Katmanı (Ana Süreç)
+
+Aşağıdaki IPC işleyicileri `ipcMain.handle` ile kaydedilir ve `preload.js` üzerinden `window.electronAPI` altında renderer’a sunulur:
+
+- `getSubtasks(taskId)` → `subtasks` tablosundan `sort_order` ile sıralanmış alt görev listesini döndürür.
+- `addSubtask(taskId, title)` → Yeni alt görev ekler; `sort_order`, o ana görevdeki en yüksek değerin bir fazlası olarak otomatik atanır. Eklenen satırın tamamını döndürür.
+- `updateSubtask(id, data)` → `data` nesnesi `title`, `completed` veya `sort_order` alanlarından birini içerebilir. `updated_at` güncellenir. Güncellenmiş kaydı döndürür.
+- `deleteSubtask(id)` → Alt görevi siler, başarı durumu döndürür.
+- `reorderSubtasks(taskId, orderedIds)` → Verilen sıralı ID dizisine göre `sort_order` değerlerini günceller (toplu güncelleme). Başarı durumu döndürür.
+- `updateTaskAutoComplete(taskId, value)` → `tasks` tablosundaki `auto_complete_subtasks` alanını günceller.
+
+**Önemli:** `updateSubtask` ile bir alt görevin `completed` değeri değiştiğinde, ana süreç tarafı şu kontrolleri yapmalıdır:
+
+1. Eğer alt görev tamamlandı olarak işaretlenmişse ve ana görev durumu (`tasks.status`) `'todo'` ise, ana görevi otomatik olarak `'in_progress'` olarak güncelle.
+2. Eğer ana görevin `auto_complete_subtasks = 1` ise ve tüm alt görevler tamamlanmışsa, ana görevi `'done'` olarak güncelle ve bu işlemi renderer’a bildir (böylece board/liste anında güncellenir).
+3. Bu mantık ana süreçte, ilgili `ipcMain.handle` içerisinde veya ayrı bir yardımcı fonksiyon aracılığıyla gerçekleştirilir.
+
+---
+
+### 18.3 Durum Yönetimi (Zustand Store)
+
+Mevcut `useTaskStore` veya yeni bir `useSubtaskStore` oluşturulabilir (tek bir store yeterlidir). Store’da:
+
+- `subtasks: Record<number, Subtask[]>` — görev ID’sine göre alt görev listelerini tutar.
+- `loadSubtasks(taskId)` → IPC ile çekip store’a yazar.
+- `addSubtask(taskId, title)`, `toggleSubtask(id)`, `removeSubtask(id)`, `reorder(taskId, newOrder)` gibi eylemler.
+- `getTaskProgress(taskId)` → store’dan hesaplanan `{ completed, total, percentage }` döner.
+
+Ana görevin durum ve otomatik tamamlama tetiklemeleri için IPC cevapları store’daki `tasks` listesini de günceller.
+
+---
+
+### 18.4 Arayüz Gereksinimleri
+
+#### 18.4.1 Görev Detay Paneli – Alt Görevler Bölümü
+
+- Görev detayının içinde, tahmini süre ve bağlantıların altında **“Alt Görevler”** başlıklı bir bölüm yer alır.
+- Bölümün üst kısmında bir **ilerleme çubuğu** ve yanında metin: `"2 / 5 tamamlandı (%40)"`. Çubuk ince, temaya uygun dolgu renginde (Soft Light’ta yumuşak mavi, Deep Dark’ta mor vs.).
+- Hemen altında **alt görev listesi** yer alır. Her satır şunları içerir:
+  - **Sürükleme kolu** (6 nokta veya ikon) – satırın solunda, yalnızca fare üzerine gelince görünür. Kullanıcı bu kolu tutup sürükleyerek sıralamayı değiştirebilir. (Board’da kullanılan `@hello-pangea/dnd` ile aynı kütüphane, `DragDropContext` + `Droppable` + `Draggable` bileşenleri kullanılır.)
+  - **Checkbox** – işaretlendiğinde alt görev tamamlanır. Checkbox’ın stili temaya uygun (yuvarlak, içi tikli).
+  - **Alt görev başlığı** – üzerine çift tıklandığında veya yanındaki düzenleme ikonuna tıklandığında satır içi düzenleme moduna geçer (inline edit). Metin girilip Enter’a basınca veya odak kaybedince kaydedilir. Tamamlanmış alt görevlerin üstü çizili ve rengi soluk görünür.
+  - **Silme butonu** – çöp kutusu ikonu, satırın en sağında, yalnızca fareyle üzerine gelindiğinde görünür.
+- Listenin en altında bir **“Alt görev ekle”** satırı bulunur (placeholder: “+ Yeni adım ekle”). Tıklanınca yeni bir satır açılır, kullanıcı başlığı yazar ve Enter ile ekler.
+
+#### 18.4.2 Sürükle-Bırak Sıralama
+
+- `@hello-pangea/dnd` kullanılarak alt görev listesi bir `Droppable` konteyner, her alt görev `Draggable` öğedir.
+- Sürükleme tamamlandığında (`onDragEnd`), yeni sıralama ID dizisi `reorderSubtasks` IPC çağrısı ile ana sürece gönderilir.
+- Optimistik güncelleme yapılır (sıralama anında store’a yansıtılır, hata durumunda geri alınır).
+
+#### 18.4.3 Otomatik Tamamlama Ayarı
+
+- Görev detayının alt görevler bölümünün hemen üstünde veya görev ayarlarında minik bir toggle: **“Tüm adımlar bitince görevi otomatik tamamla”**. Bu toggle, `auto_complete_subtasks` değerini değiştirir.
+- Varsayılan olarak kapalıdır.
+
+#### 18.4.4 Board ve Liste Görünümüne Yansımalar
+
+- Board kartında ve liste öğesinde, eğer görevin alt görevleri varsa, görev başlığının altında ince bir ilerleme çubuğu ve `2/5` gibi bir ibare görünür.
+- Tamamlanmış alt görevler ana görevi etkilemez ancak ilerleme çubuğuyla motivasyon sağlar.
+
+#### 18.4.5 Özel Durumlar ve İncelikler
+
+- Bir alt görevin tamamlanmasıyla ana görev `todo` → `in_progress` otomatik geçişi, kullanıcıya bildirilmez, sadece durum güncellenir (board’da kart yer değiştirir).
+- `auto_complete_subtasks` aktif olan bir görevde tüm alt görevler tamamlandığında, ana görev `done` olur ve bu durum masaüstü bildirimi ile kullanıcıya haber verilir: “Tüm adımlar tamamlandı! ‘Blog yazısı’ görevi otomatik olarak tamamlandı.” Bildirim opsiyonu ayarlarda kapatılabilir.
+- Eğer kullanıcı manuel olarak ana görevi `done` yaparsa, alt görevlerin tamamlanma durumu değişmez; hepsi olduğu gibi kalır. Bu sayede kısmi tamamlanan işler de kapatılabilir.
+
+---
+
+### 18.5 Tasarım Detayları
+
+- **İlerleme çubuğu:** yükseklik 4-6px, border-radius 2px. Dolgu rengi temanın vurgu rengi, boş kısım soluk gri.
+- **Checkbox:** Lucide `CheckCircle` veya `Circle` ikonları kullanılabilir. Tamamlanmışsa `CheckCircle` dolgulu ve yeşil tonda.
+- **Satır hover efekti:** Arka plan yarı saydam hale gelir, sürükleme kolu ve silme butonu belirginleşir.
+- **Düzenleme modu:** Input alanı satırın tamamını kaplar, otomatik odaklanır, kenarlığı temanın vurgu rengindedir.
+- **Boş liste:** “Bu görev için henüz alt adım eklenmedi. Büyük işleri küçük parçalara bölmek ilerlemeyi hissetmeni sağlar.” şeklinde motive edici bir boş durum mesajı.
+
+---
+
+### 18.6 Entegrasyon ve Test Adımları
+
+1. Görev detayına alt görevler bölümünü ekle.
+2. Ekleme, düzenleme, silme, tamamlama işlemlerini sırasıyla test et.
+3. Sürükle-bırak ile sıralamayı değiştir, sayfayı yenileyip sıranın korunduğunu doğrula.
+4. Otomatik durum geçişlerini kontrol et: `todo` olan bir görevde ilk alt görev tamamlandığında `in_progress`’a geçtiğini doğrula.
+5. `auto_complete_subtasks` açıkken tüm alt görevleri tamamla, ana görevin `done` olduğunu ve bildirim geldiğini test et.
+6. Board görünümünde karttaki ilerleme çubuğunun doğru güncellendiğini gözlemle.
+7. Bir alt görevi silince yüzdelik hesabının doğru güncellendiğini kontrol et.
+
+---
+
+Bu görev tamamlandığında, FocusFlow’un görev yönetimi bir seviye daha derinleşecek. Artık karmaşık projeleri adım adım ilerlerken izleyebilecek, hangi noktada olduğunu anında görebileceksin. Sırada istersen **Hızlı Yakalama Penceresi** veya **Boşta Kalma Uyarısı** gibi özellikleri de aynı detayda hazırlamaya hazırım! 🚀
