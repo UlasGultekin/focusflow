@@ -59,6 +59,8 @@ let tray = null;
 let isQuitting = false;
 
 function createWindow() {
+  const appIconPath = path.join(__dirname, 'icon.png');
+
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -67,6 +69,7 @@ function createWindow() {
     frame: true,
     titleBarStyle: 'default',
     title: 'FocusFlow',
+    icon: fs.existsSync(appIconPath) ? appIconPath : undefined,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -79,7 +82,6 @@ function createWindow() {
 
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173');
-    // Eğer sunucuya bağlanılamazsa 1 sn sonra tekrar dene
     mainWindow.webContents.on('did-fail-load', () => {
       console.log('Dev server henüz hazır değil, 1 saniye sonra tekrar deneniyor...');
       setTimeout(() => {
@@ -106,7 +108,10 @@ function createWindow() {
 function createTray() {
   try {
     const iconPath = path.join(__dirname, 'icon.png');
-    let icon = fs.existsSync(iconPath) ? nativeImage.createFromPath(iconPath) : nativeImage.createEmpty();
+    let icon = fs.existsSync(iconPath)
+      ? nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 })
+      : nativeImage.createEmpty();
+
     if (icon.isEmpty()) {
       icon = nativeImage.createFromBuffer(
         Buffer.from('iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAAOSURBVDhPY2AYBaACAAAARAAB+Y25bAAAAABJRU5ErkJggg==', 'base64')

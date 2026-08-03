@@ -36,6 +36,7 @@
   "build": {
     "appId": "com.focusflow.app",
     "productName": "FocusFlow",
+    "icon": "electron/icon.png",
     "directories": {
       "output": "dist-electron"
     },
@@ -44,7 +45,8 @@
       "electron/**/*"
     ],
     "win": {
-      "target": "dir"
+      "target": "dir",
+      "icon": "electron/icon.png"
     }
   }
 }
