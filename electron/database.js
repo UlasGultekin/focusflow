@@ -66,7 +66,8 @@ export async function initDatabase() {
       start_time TEXT NOT NULL,
       end_time TEXT,
       duration_seconds INTEGER,
-      type TEXT DEFAULT 'manual'
+      type TEXT DEFAULT 'manual',
+      notes TEXT DEFAULT ''
     );
 
     CREATE TABLE IF NOT EXISTS notes (
@@ -144,6 +145,18 @@ export async function initDatabase() {
       UNIQUE(source_task_id, target_task_id)
     );
 
+    CREATE TABLE IF NOT EXISTS search_index (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      source_type TEXT NOT NULL,
+      source_id INTEGER NOT NULL,
+      title TEXT,
+      content TEXT,
+      task_id INTEGER,
+      date_info TEXT,
+      status TEXT,
+      extra_json TEXT
+    );
+
     CREATE TABLE IF NOT EXISTS pomodoro_settings (
       id INTEGER PRIMARY KEY CHECK (id = 1),
       focus_duration INTEGER DEFAULT 25,
@@ -161,7 +174,7 @@ export async function initDatabase() {
     );
   `);
 
-  // Güvenli Migrasyon
+  // Güvenli Migrasyonlar
   try {
     const tableInfo = db.exec("PRAGMA table_info(tasks)");
     if (tableInfo.length > 0) {
@@ -179,6 +192,15 @@ export async function initDatabase() {
         db.run("ALTER TABLE tasks ADD COLUMN auto_complete_subtasks INTEGER DEFAULT 0");
       }
     }
+
+    const sessionInfo = db.exec("PRAGMA table_info(task_sessions)");
+    if (sessionInfo.length > 0) {
+      const sessionCols = sessionInfo[0].values.map((col) => col[1]);
+      if (!sessionCols.includes('notes')) {
+        db.run("ALTER TABLE task_sessions ADD COLUMN notes TEXT DEFAULT ''");
+      }
+    }
+
     db.run("UPDATE tasks SET status = 'todo' WHERE status = 'active'");
     db.run("UPDATE tasks SET status = 'done' WHERE status = 'completed'");
   } catch (err) {
@@ -238,7 +260,7 @@ export async function initDatabase() {
         120,
         'medium',
         'İş',
-        '#A855F7',
+        '#10B981',
         nowIso,
         nowIso,
         'todo',
@@ -291,6 +313,9 @@ export async function initDatabase() {
     );
   }
 
+  // Arama İndeksini Yeniden Oluştur
+  rebuildSearchIndex();
+
   saveDb();
   return db;
 }
@@ -312,6 +337,129 @@ function resultToObjects(result) {
 function getLastInserted(tableName) {
   const res = db.exec(`SELECT * FROM ${tableName} ORDER BY id DESC LIMIT 1`);
   return resultToObjects(res)[0];
+}
+
+// ARAMA İNDEKSLEME İŞLEMLERİ (GÖREV 20)
+export function indexRecord(source_type, source_id, title, content, task_id = null, date_info = '', status = '', extra_json = '') {
+  db.run("DELETE FROM search_index WHERE source_type = ? AND source_id = ?", [source_type, source_id]);
+  db.run(
+    `INSERT INTO search_index (source_type, source_id, title, content, task_id, date_info, status, extra_json)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [source_type, source_id, title || '', content || '', task_id, date_info || '', status || '', extra_json || '']
+  );
+  saveDb();
+}
+
+export function removeIndexRecord(source_type, source_id) {
+  db.run("DELETE FROM search_index WHERE source_type = ? AND source_id = ?", [source_type, source_id]);
+  saveDb();
+}
+
+export function rebuildSearchIndex() {
+  if (!db) return;
+  db.run("DELETE FROM search_index");
+
+  // 1. Tasks
+  const tasks = getTasks('all');
+  tasks.forEach((t) => {
+    indexRecord('task', t.id, t.title, t.description || '', t.id, t.planned_date || (t.created_at ? t.created_at.slice(0, 10) : ''), t.status);
+  });
+
+  // 2. Subtasks
+  const subtasks = resultToObjects(db.exec("SELECT * FROM subtasks"));
+  subtasks.forEach((st) => {
+    indexRecord('subtask', st.id, st.title, st.title, st.task_id, st.created_at ? st.created_at.slice(0, 10) : '', st.completed ? 'done' : 'todo');
+  });
+
+  // 3. Notes
+  const notes = resultToObjects(db.exec("SELECT * FROM notes"));
+  notes.forEach((n) => {
+    const type = n.task_id ? 'task_note' : 'general_note';
+    indexRecord(type, n.id, n.task_id ? `Görev Notu #${n.id}` : 'Genel Not', n.content, n.task_id, n.created_at ? n.created_at.slice(0, 10) : '');
+  });
+
+  // 4. Journal entries
+  const journalEntries = getAllJournalEntries();
+  journalEntries.forEach((j) => {
+    indexRecord('journal', j.id, `Günlük - ${j.entry_date}`, j.content || '', null, j.entry_date);
+  });
+
+  // 5. Session notes
+  const sessions = resultToObjects(db.exec("SELECT * FROM task_sessions WHERE notes IS NOT NULL AND notes != ''"));
+  sessions.forEach((s) => {
+    indexRecord('session_note', s.id, `Oturum Notu #${s.id}`, s.notes, s.task_id, s.start_time ? s.start_time.slice(0, 10) : '');
+  });
+
+  // 6. Attachments
+  const attachments = resultToObjects(db.exec("SELECT * FROM task_attachments"));
+  attachments.forEach((a) => {
+    indexRecord('attachment', a.id, a.name, `${a.name} (${a.path})`, a.task_id, a.added_at ? a.added_at.slice(0, 10) : '');
+  });
+
+  saveDb();
+  return true;
+}
+
+export function searchAll(queryStr = '', filters = {}) {
+  const query = (queryStr || '').trim().toLowerCase();
+  let records = resultToObjects(db.exec("SELECT * FROM search_index ORDER BY id DESC"));
+
+  if (query) {
+    const tokens = query.split(/\s+/);
+    records = records.filter((rec) => {
+      const fullText = `${rec.title} ${rec.content} ${rec.date_info} ${rec.status}`.toLowerCase();
+      return tokens.every((token) => fullText.includes(token));
+    });
+  }
+
+  // Apply filters
+  if (filters.sourceTypes && filters.sourceTypes.length > 0) {
+    records = records.filter((r) => filters.sourceTypes.includes(r.source_type));
+  }
+  if (filters.status && filters.status !== 'all') {
+    records = records.filter((r) => r.status === filters.status);
+  }
+  if (filters.dateFrom) {
+    records = records.filter((r) => r.date_info >= filters.dateFrom);
+  }
+  if (filters.dateTo) {
+    records = records.filter((r) => r.date_info <= filters.dateTo);
+  }
+  if (filters.taskId) {
+    records = records.filter((r) => r.task_id === Number(filters.taskId));
+  }
+
+  return records.map((rec) => {
+    let snippet = rec.content || rec.title || '';
+    if (query && snippet) {
+      const idx = snippet.toLowerCase().indexOf(query);
+      if (idx !== -1) {
+        const start = Math.max(0, idx - 30);
+        const end = Math.min(snippet.length, idx + query.length + 40);
+        let excerpt = snippet.slice(start, end);
+        const regex = new RegExp(`(${query.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')})`, 'gi');
+        excerpt = excerpt.replace(regex, '<mark class="bg-amber-300 text-slate-900 rounded px-1 font-semibold">$1</mark>');
+        snippet = (start > 0 ? '...' : '') + excerpt + (end < snippet.length ? '...' : '');
+      } else {
+        snippet = snippet.slice(0, 80);
+      }
+    } else {
+      snippet = snippet.slice(0, 80);
+    }
+
+    return {
+      ...rec,
+      snippet,
+    };
+  });
+}
+
+export function getSearchSuggestions(partialQueryStr = '') {
+  const query = (partialQueryStr || '').trim().toLowerCase();
+  if (!query) return [];
+
+  const results = searchAll(query);
+  return results.slice(0, 8);
 }
 
 // GÖREV İŞLEMLERİ
@@ -351,7 +499,11 @@ export function addTask(taskData) {
     ]
   );
   saveDb();
-  return getLastInserted('tasks');
+  const newTask = getLastInserted('tasks');
+  if (newTask) {
+    indexRecord('task', newTask.id, newTask.title, newTask.description || '', newTask.id, newTask.planned_date || now.slice(0, 10), newTask.status);
+  }
+  return newTask;
 }
 
 export function updateTask(id, taskData) {
@@ -372,8 +524,12 @@ export function updateTask(id, taskData) {
   db.run(sql, values);
   saveDb();
 
-  const updated = db.exec(`SELECT * FROM tasks WHERE id = ${id}`);
-  return resultToObjects(updated)[0];
+  const updatedRes = db.exec(`SELECT * FROM tasks WHERE id = ${id}`);
+  const updated = resultToObjects(updatedRes)[0];
+  if (updated) {
+    indexRecord('task', updated.id, updated.title, updated.description || '', updated.id, updated.planned_date || now.slice(0, 10), updated.status);
+  }
+  return updated;
 }
 
 export function deleteTask(id) {
@@ -383,6 +539,7 @@ export function deleteTask(id) {
   db.run(`DELETE FROM notes WHERE task_id = ${id}`);
   db.run(`DELETE FROM task_attachments WHERE task_id = ${id}`);
   db.run(`DELETE FROM task_links WHERE source_task_id = ${id} OR target_task_id = ${id}`);
+  removeIndexRecord('task', id);
   saveDb();
   return true;
 }
@@ -404,7 +561,11 @@ export function addSubtask(taskId, title) {
     [taskId, title, 0, nextOrder, nowIso, nowIso]
   );
   saveDb();
-  return getLastInserted('subtasks');
+  const newSubtask = getLastInserted('subtasks');
+  if (newSubtask) {
+    indexRecord('subtask', newSubtask.id, newSubtask.title, newSubtask.title, newSubtask.task_id, nowIso.slice(0, 10), 'todo');
+  }
+  return newSubtask;
 }
 
 export function updateSubtask(id, data) {
@@ -424,36 +585,38 @@ export function updateSubtask(id, data) {
   const sql = `UPDATE subtasks SET ${fields.join(', ')} WHERE id = ${id}`;
   db.run(sql, values);
 
-  // Otomatik geçiş kontrolleri
-  const subtaskObj = resultToObjects(db.exec(`SELECT * FROM subtasks WHERE id = ${id}`))[0];
-  if (subtaskObj) {
-    const taskId = subtaskObj.task_id;
-    const taskObj = resultToObjects(db.exec(`SELECT * FROM tasks WHERE id = ${taskId}`))[0];
+  const updatedRes = db.exec(`SELECT * FROM subtasks WHERE id = ${id}`);
+  const updated = resultToObjects(updatedRes)[0];
 
-    if (taskObj) {
-      // 1. Alt görev tamamlandığında ana görev 'todo' ise 'in_progress' yap
-      if (data.completed === 1 && taskObj.status === 'todo') {
-        db.run(`UPDATE tasks SET status = 'in_progress', updated_at = ? WHERE id = ${taskId}`, [nowIso]);
+  if (updated) {
+    indexRecord('subtask', updated.id, updated.title, updated.title, updated.task_id, nowIso.slice(0, 10), updated.completed ? 'done' : 'todo');
+
+    // Otomatik Ana Görev Durum Geçişleri
+    const mainTaskRes = db.exec(`SELECT * FROM tasks WHERE id = ${updated.task_id}`);
+    const mainTask = resultToObjects(mainTaskRes)[0];
+
+    if (mainTask) {
+      if (updated.completed && mainTask.status === 'todo') {
+        updateTask(mainTask.id, { status: 'in_progress' });
       }
 
-      // 2. auto_complete_subtasks = 1 ise ve TÜM alt görevler tamamlanmışsa 'done' yap
-      if (taskObj.auto_complete_subtasks === 1) {
-        const uncompletedRes = db.exec(`SELECT COUNT(*) as count FROM subtasks WHERE task_id = ${taskId} AND completed = 0`);
-        const uncompletedCount = uncompletedRes[0].values[0][0];
-
-        if (uncompletedCount === 0) {
-          db.run(`UPDATE tasks SET status = 'done', updated_at = ? WHERE id = ${taskId}`, [nowIso]);
+      if (mainTask.auto_complete_subtasks === 1) {
+        const allSubs = getSubtasks(mainTask.id);
+        const allDone = allSubs.length > 0 && allSubs.every((s) => s.completed === 1);
+        if (allDone && mainTask.status !== 'done') {
+          updateTask(mainTask.id, { status: 'done' });
         }
       }
     }
   }
 
   saveDb();
-  return resultToObjects(db.exec(`SELECT * FROM subtasks WHERE id = ${id}`))[0];
+  return updated;
 }
 
 export function deleteSubtask(id) {
   db.run(`DELETE FROM subtasks WHERE id = ${id}`);
+  removeIndexRecord('subtask', id);
   saveDb();
   return true;
 }
@@ -464,197 +627,86 @@ export function reorderSubtasks(taskId, orderedIds) {
     db.run(`UPDATE subtasks SET sort_order = ?, updated_at = ? WHERE id = ?`, [index + 1, nowIso, id]);
   });
   saveDb();
-  return getSubtasks(taskId);
+  return true;
 }
 
-// OTURUM İŞLEMLERİ
+// SEANS İŞLEMLERİ & OTURUM NOTLARI (GÖREV 19)
 export function startSession(taskId, type = 'manual') {
-  const startTime = new Date().toISOString();
+  const now = new Date().toISOString();
   db.run(
-    `INSERT INTO task_sessions (task_id, start_time, type) VALUES (?, ?, ?)`,
-    [taskId || null, startTime, type]
+    `INSERT INTO task_sessions (task_id, start_time, type, notes) VALUES (?, ?, ?, ?)`,
+    [taskId, now, type, '']
   );
+  saveDb();
 
   if (taskId) {
-    db.run(`UPDATE tasks SET status = 'in_progress', updated_at = ? WHERE id = ${taskId}`, [startTime]);
+    db.run(`UPDATE tasks SET status = 'in_progress', updated_at = '${now}' WHERE id = ${taskId} AND status = 'todo'`);
+    saveDb();
   }
 
-  saveDb();
   return getLastInserted('task_sessions');
 }
 
 export function endSession(sessionId) {
-  const endTime = new Date().toISOString();
-  const res = db.exec(`SELECT * FROM task_sessions WHERE id = ${sessionId}`);
-  const sessions = resultToObjects(res);
-  if (!sessions.length) return null;
+  const now = new Date().toISOString();
+  const sessionRes = db.exec(`SELECT * FROM task_sessions WHERE id = ${sessionId}`);
+  const session = resultToObjects(sessionRes)[0];
 
-  const session = sessions[0];
-  const startMs = new Date(session.start_time).getTime();
-  const endMs = new Date(endTime).getTime();
-  const durationSeconds = Math.max(0, Math.floor((endMs - startMs) / 1000));
+  if (session && session.start_time) {
+    const startTime = new Date(session.start_time);
+    const endTime = new Date(now);
+    const durationSeconds = Math.round((endTime - startTime) / 1000);
 
-  db.run(
-    `UPDATE task_sessions SET end_time = ?, duration_seconds = ? WHERE id = ${sessionId}`,
-    [endTime, durationSeconds]
-  );
+    db.run(
+      `UPDATE task_sessions SET end_time = ?, duration_seconds = ? WHERE id = ?`,
+      [now, durationSeconds, sessionId]
+    );
+    saveDb();
+  }
+
+  const updatedRes = db.exec(`SELECT * FROM task_sessions WHERE id = ${sessionId}`);
+  return resultToObjects(updatedRes)[0];
+}
+
+export function updateSessionNotes(sessionId, notes) {
+  db.run("UPDATE task_sessions SET notes = ? WHERE id = ?", [notes || '', sessionId]);
   saveDb();
 
-  const updated = db.exec(`SELECT * FROM task_sessions WHERE id = ${sessionId}`);
-  return resultToObjects(updated)[0];
+  const updatedRes = db.exec(`SELECT * FROM task_sessions WHERE id = ${sessionId}`);
+  const updated = resultToObjects(updatedRes)[0];
+  if (updated) {
+    if (notes && notes.trim()) {
+      indexRecord('session_note', updated.id, `Oturum Notu #${updated.id}`, notes, updated.task_id, updated.start_time ? updated.start_time.slice(0, 10) : '');
+    } else {
+      removeIndexRecord('session_note', updated.id);
+    }
+  }
+  return updated;
 }
 
 export function getTaskSessions(taskId) {
-  if (taskId) {
-    const res = db.exec(`SELECT * FROM task_sessions WHERE task_id = ${taskId} ORDER BY start_time DESC`);
-    return resultToObjects(res);
-  }
-  const res = db.exec('SELECT * FROM task_sessions ORDER BY start_time DESC');
+  const res = db.exec(`SELECT * FROM task_sessions WHERE task_id = ${taskId} ORDER BY start_time DESC`);
   return resultToObjects(res);
 }
 
 export function getAllSessions(startDate, endDate) {
-  let res;
-  if (startDate && endDate) {
-    res = db.exec(`
-      SELECT s.*, t.title as task_title, t.color as task_color
-      FROM task_sessions s
-      LEFT JOIN tasks t ON s.task_id = t.id
-      WHERE s.start_time >= '${startDate}' AND s.start_time <= '${endDate}'
-      ORDER BY s.start_time DESC
-    `);
-  } else {
-    res = db.exec(`
-      SELECT s.*, t.title as task_title, t.color as task_color
-      FROM task_sessions s
-      LEFT JOIN tasks t ON s.task_id = t.id
-      ORDER BY s.start_time DESC
-    `);
-  }
+  let query = 'SELECT * FROM task_sessions WHERE duration_seconds IS NOT NULL';
+  if (startDate) query += ` AND start_time >= '${startDate}'`;
+  if (endDate) query += ` AND start_time <= '${endDate}'`;
+  query += ' ORDER BY start_time DESC';
+
+  const res = db.exec(query);
   return resultToObjects(res);
-}
-
-// GÖREV EKLERİ
-export function getTaskAttachments(taskId) {
-  const res = db.exec(`SELECT * FROM task_attachments WHERE task_id = ${taskId} ORDER BY added_at DESC`);
-  return resultToObjects(res);
-}
-
-export function addTaskAttachment(taskId, name, pathStr, type = 'file') {
-  const nowIso = new Date().toISOString();
-  db.run(
-    `INSERT INTO task_attachments (task_id, name, path, type, added_at) VALUES (?, ?, ?, ?, ?)`,
-    [taskId, name, pathStr, type, nowIso]
-  );
-  saveDb();
-  return getLastInserted('task_attachments');
-}
-
-export function deleteTaskAttachment(id) {
-  db.run(`DELETE FROM task_attachments WHERE id = ${id}`);
-  saveDb();
-  return true;
-}
-
-// AKIŞ GÜNLÜĞÜ
-export function getJournalEntry(dateStr) {
-  const res = db.exec(`SELECT * FROM journal_entries WHERE entry_date = '${dateStr}'`);
-  return resultToObjects(res)[0] || null;
-}
-
-export function saveJournalEntry(dateStr, content, mood = 4) {
-  const nowIso = new Date().toISOString();
-  const existing = getJournalEntry(dateStr);
-
-  if (existing) {
-    db.run(
-      `UPDATE journal_entries SET content = ?, mood = ?, updated_at = ? WHERE entry_date = ?`,
-      [content, mood, nowIso, dateStr]
-    );
-  } else {
-    db.run(
-      `INSERT INTO journal_entries (entry_date, content, mood, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
-      [dateStr, content, mood, nowIso, nowIso]
-    );
-  }
-  saveDb();
-  return getJournalEntry(dateStr);
-}
-
-export function searchJournal(query) {
-  const res = db.exec(`SELECT * FROM journal_entries WHERE content LIKE '%${query}%' ORDER BY entry_date DESC`);
-  return resultToObjects(res);
-}
-
-export function getAllJournalEntries() {
-  const res = db.exec('SELECT * FROM journal_entries ORDER BY entry_date DESC');
-  return resultToObjects(res);
-}
-
-// GÖREV BAĞLANTILARI
-export function getTaskLinks(taskId) {
-  const sourceRes = db.exec(`
-    SELECT l.*, t.title as target_title, t.status as target_status
-    FROM task_links l
-    LEFT JOIN tasks t ON l.target_task_id = t.id
-    WHERE l.source_task_id = ${taskId}
-  `);
-  const targetRes = db.exec(`
-    SELECT l.*, t.title as source_title, t.status as source_status
-    FROM task_links l
-    LEFT JOIN tasks t ON l.source_task_id = t.id
-    WHERE l.target_task_id = ${taskId}
-  `);
-
-  return {
-    blockingMe: resultToObjects(sourceRes),
-    blockedByMe: resultToObjects(targetRes),
-  };
-}
-
-export function addTaskLink(sourceTaskId, targetTaskId, linkType = 'blocks') {
-  if (sourceTaskId === targetTaskId) return null;
-  const nowIso = new Date().toISOString();
-  try {
-    db.run(
-      `INSERT INTO task_links (source_task_id, target_task_id, link_type, created_at) VALUES (?, ?, ?, ?)`,
-      [sourceTaskId, targetTaskId, linkType, nowIso]
-    );
-    saveDb();
-  } catch (e) {
-    console.error('Task link error:', e);
-  }
-  return getTaskLinks(sourceTaskId);
-}
-
-export function deleteTaskLink(id) {
-  db.run(`DELETE FROM task_links WHERE id = ${id}`);
-  saveDb();
-  return true;
-}
-
-export function isTaskBlocked(taskId) {
-  const res = db.exec(`
-    SELECT l.*, t.title, t.status
-    FROM task_links l
-    JOIN tasks t ON l.target_task_id = t.id
-    WHERE l.source_task_id = ${taskId} AND l.link_type = 'blocks' AND t.status != 'done'
-  `);
-  const blockers = resultToObjects(res);
-  return {
-    isBlocked: blockers.length > 0,
-    blockers,
-  };
 }
 
 // NOT İŞLEMLERİ
 export function getNotes(taskId = null) {
-  let res;
+  let query = 'SELECT * FROM notes';
   if (taskId) {
-    res = db.exec(`SELECT * FROM notes WHERE task_id = ${taskId} ORDER BY updated_at DESC`);
-  } else {
-    res = db.exec('SELECT * FROM notes WHERE task_id IS NULL ORDER BY updated_at DESC');
+    query += ` WHERE task_id = ${taskId}`;
   }
+  query += ' ORDER BY updated_at DESC';
+  const res = db.exec(query);
   return resultToObjects(res);
 }
 
@@ -662,113 +714,43 @@ export function addNote(content, taskId = null) {
   const now = new Date().toISOString();
   db.run(
     `INSERT INTO notes (task_id, content, created_at, updated_at) VALUES (?, ?, ?, ?)`,
-    [taskId || null, content, now, now]
+    [taskId, content, now, now]
   );
   saveDb();
-  return getLastInserted('notes');
+  const newNote = getLastInserted('notes');
+  if (newNote) {
+    const type = taskId ? 'task_note' : 'general_note';
+    indexRecord(type, newNote.id, taskId ? `Görev Notu #${newNote.id}` : 'Genel Not', newNote.content, taskId, now.slice(0, 10));
+  }
+  return newNote;
 }
 
-export function updateNote(id, content) {
+export function updateNote(id, content, taskId = null) {
   const now = new Date().toISOString();
-  db.run(`UPDATE notes SET content = ?, updated_at = ? WHERE id = ${id}`, [content, now]);
+  db.run(
+    `UPDATE notes SET content = ?, updated_at = ? WHERE id = ${id}`,
+    [content, now]
+  );
   saveDb();
-
-  const updated = db.exec(`SELECT * FROM notes WHERE id = ${id}`);
-  return resultToObjects(updated)[0];
+  const updatedRes = db.exec(`SELECT * FROM notes WHERE id = ${id}`);
+  const updated = resultToObjects(updatedRes)[0];
+  if (updated) {
+    const type = updated.task_id ? 'task_note' : 'general_note';
+    indexRecord(type, updated.id, updated.task_id ? `Görev Notu #${updated.id}` : 'Genel Not', updated.content, updated.task_id, now.slice(0, 10));
+  }
+  return updated;
 }
 
 export function deleteNote(id) {
+  const noteRes = db.exec(`SELECT * FROM notes WHERE id = ${id}`);
+  const note = resultToObjects(noteRes)[0];
+  if (note) {
+    const type = note.task_id ? 'task_note' : 'general_note';
+    removeIndexRecord(type, id);
+  }
   db.run(`DELETE FROM notes WHERE id = ${id}`);
   saveDb();
   return true;
-}
-
-// EĞİTİM İŞLEMLERİ
-export function getCourses() {
-  const res = db.exec('SELECT * FROM courses ORDER BY created_at DESC');
-  return resultToObjects(res);
-}
-
-export function addCourse(courseData) {
-  const nowIso = new Date().toISOString();
-  db.run(
-    `INSERT INTO courses (title, url, category, total_spent_minutes, created_at)
-     VALUES (?, ?, ?, ?, ?)`,
-    [
-      courseData.title,
-      courseData.url || '',
-      courseData.category || 'Yazılım',
-      0,
-      nowIso,
-    ]
-  );
-  saveDb();
-  return getLastInserted('courses');
-}
-
-export function deleteCourse(id) {
-  db.run(`DELETE FROM courses WHERE id = ${id}`);
-  db.run(`DELETE FROM course_sessions WHERE course_id = ${id}`);
-  saveDb();
-  return true;
-}
-
-export function startCourseSession(courseId) {
-  const startTime = new Date().toISOString();
-  db.run(
-    `INSERT INTO course_sessions (course_id, start_time) VALUES (?, ?)`,
-    [courseId, startTime]
-  );
-  saveDb();
-  return getLastInserted('course_sessions');
-}
-
-export function endCourseSession(sessionId) {
-  const endTime = new Date().toISOString();
-  const res = db.exec(`SELECT * FROM course_sessions WHERE id = ${sessionId}`);
-  const sessions = resultToObjects(res);
-  if (!sessions.length) return null;
-
-  const session = sessions[0];
-  const startMs = new Date(session.start_time).getTime();
-  const endMs = new Date(endTime).getTime();
-  const durationSeconds = Math.max(0, Math.floor((endMs - startMs) / 1000));
-  const durationMinutes = Math.max(1, Math.round(durationSeconds / 60));
-
-  db.run(
-    `UPDATE course_sessions SET end_time = ?, duration_seconds = ? WHERE id = ${sessionId}`,
-    [endTime, durationSeconds]
-  );
-
-  db.run(
-    `UPDATE courses SET total_spent_minutes = total_spent_minutes + ${durationMinutes} WHERE id = ${session.course_id}`
-  );
-
-  const courseObj = resultToObjects(db.exec(`SELECT * FROM courses WHERE id = ${session.course_id}`))[0];
-
-  if (courseObj) {
-    db.run(
-      `INSERT INTO tasks (title, description, estimated_minutes, priority, category, color, created_at, updated_at, status, planned_date, planned_start_time, task_type)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        `[Eğitim] ${courseObj.title} - ${durationMinutes}dk Çalışma`,
-        `Eğitim seansı başarıyla tamamlandı. (${courseObj.category})`,
-        durationMinutes,
-        'medium',
-        'Eğitim',
-        '#6366F1',
-        endTime,
-        endTime,
-        'done',
-        endTime.slice(0, 10),
-        endTime.slice(11, 16),
-        'task',
-      ]
-    );
-  }
-
-  saveDb();
-  return getCourses();
 }
 
 // ALIŞKANLIK İŞLEMLERİ
@@ -778,7 +760,7 @@ export function getHabits() {
 }
 
 export function addHabit(habitData) {
-  const nowIso = new Date().toISOString();
+  const now = new Date().toISOString();
   db.run(
     `INSERT INTO habits (name, description, color, frequency, goal_minutes, created_at)
      VALUES (?, ?, ?, ?, ?, ?)`,
@@ -788,7 +770,7 @@ export function addHabit(habitData) {
       habitData.color || '#5B8DEF',
       habitData.frequency || 'daily',
       habitData.goal_minutes || 0,
-      nowIso,
+      now,
     ]
   );
   saveDb();
@@ -803,21 +785,20 @@ export function deleteHabit(id) {
 }
 
 export function toggleHabitCompletion(habitId, dateStr, value = 1) {
-  const nowIso = new Date().toISOString();
-  const existing = db.exec(
+  const now = new Date().toISOString();
+  const check = db.exec(
     `SELECT * FROM habit_completions WHERE habit_id = ${habitId} AND date = '${dateStr}'`
   );
-  const completions = resultToObjects(existing);
+  const existing = resultToObjects(check);
 
-  if (completions.length > 0) {
-    db.run(`DELETE FROM habit_completions WHERE id = ${completions[0].id}`);
+  if (existing.length > 0) {
+    db.run(`DELETE FROM habit_completions WHERE habit_id = ${habitId} AND date = '${dateStr}'`);
   } else {
     db.run(
       `INSERT INTO habit_completions (habit_id, date, value, completed_at) VALUES (?, ?, ?, ?)`,
-      [habitId, dateStr, value, nowIso]
+      [habitId, dateStr, value, now]
     );
   }
-
   saveDb();
   return getHabitCompletions(habitId);
 }
@@ -830,6 +811,190 @@ export function getHabitCompletions(habitId = null) {
     res = db.exec('SELECT * FROM habit_completions ORDER BY date DESC');
   }
   return resultToObjects(res);
+}
+
+// EĞİTİMLER & KURSLAR
+export function getCourses() {
+  const res = db.exec('SELECT * FROM courses ORDER BY created_at DESC');
+  return resultToObjects(res);
+}
+
+export function addCourse(courseData) {
+  const now = new Date().toISOString();
+  db.run(
+    `INSERT INTO courses (title, url, category, total_spent_minutes, created_at) VALUES (?, ?, ?, ?, ?)`,
+    [courseData.title, courseData.url || '', courseData.category || 'Yazılım', 0, now]
+  );
+  saveDb();
+  return getLastInserted('courses');
+}
+
+export function deleteCourse(id) {
+  db.run(`DELETE FROM courses WHERE id = ${id}`);
+  db.run(`DELETE FROM course_sessions WHERE course_id = ${id}`);
+  saveDb();
+  return true;
+}
+
+export function startCourseSession(courseId) {
+  const now = new Date().toISOString();
+  db.run(`INSERT INTO course_sessions (course_id, start_time) VALUES (?, ?)`, [courseId, now]);
+  saveDb();
+  return getLastInserted('course_sessions');
+}
+
+export function endCourseSession(sessionId) {
+  const now = new Date().toISOString();
+  const sessionRes = db.exec(`SELECT * FROM course_sessions WHERE id = ${sessionId}`);
+  const session = resultToObjects(sessionRes)[0];
+
+  if (session && session.start_time) {
+    const startTime = new Date(session.start_time);
+    const endTime = new Date(now);
+    const durationSeconds = Math.round((endTime - startTime) / 1000);
+    const durationMinutes = Math.max(1, Math.round(durationSeconds / 60));
+
+    db.run(`UPDATE course_sessions SET end_time = ?, duration_seconds = ? WHERE id = ?`, [now, durationSeconds, sessionId]);
+    db.run(`UPDATE courses SET total_spent_minutes = total_spent_minutes + ? WHERE id = ?`, [durationMinutes, session.course_id]);
+
+    const courseRes = db.exec(`SELECT * FROM courses WHERE id = ${session.course_id}`);
+    const course = resultToObjects(courseRes)[0];
+
+    if (course) {
+      addTask({
+        title: `[Eğitim] ${course.title} (${durationMinutes} dk Çalışıldı)`,
+        description: `Eğitim Linki: ${course.url || 'Yok'}\nToplam Tamamlanan Çalışma Oturumu.`,
+        estimated_minutes: durationMinutes,
+        category: course.category || 'Eğitim',
+        priority: 'medium',
+        status: 'done',
+      });
+    }
+
+    saveDb();
+  }
+
+  const updatedRes = db.exec(`SELECT * FROM course_sessions WHERE id = ${sessionId}`);
+  return resultToObjects(updatedRes)[0];
+}
+
+// DOSYA EKLERİ (ATTACHMENTS - Görev 15)
+export function getTaskAttachments(taskId) {
+  const res = db.exec(`SELECT * FROM task_attachments WHERE task_id = ${taskId} ORDER BY added_at DESC`);
+  return resultToObjects(res);
+}
+
+export function addTaskAttachment(taskId, name, filePath, type = 'file') {
+  const now = new Date().toISOString();
+  db.run(
+    `INSERT INTO task_attachments (task_id, name, path, type, added_at) VALUES (?, ?, ?, ?, ?)`,
+    [taskId, name, filePath, type, now]
+  );
+  saveDb();
+  const newAtt = getLastInserted('task_attachments');
+  if (newAtt) {
+    indexRecord('attachment', newAtt.id, newAtt.name, `${newAtt.name} (${newAtt.path})`, taskId, now.slice(0, 10));
+  }
+  return newAtt;
+}
+
+export function deleteTaskAttachment(id) {
+  removeIndexRecord('attachment', id);
+  db.run(`DELETE FROM task_attachments WHERE id = ${id}`);
+  saveDb();
+  return true;
+}
+
+// GÜNLÜK (JOURNAL - Görev 16)
+export function getJournalEntry(dateStr) {
+  const res = db.exec(`SELECT * FROM journal_entries WHERE entry_date = '${dateStr}'`);
+  return resultToObjects(res)[0] || null;
+}
+
+export function saveJournalEntry(dateStr, content, mood = 4) {
+  const now = new Date().toISOString();
+  const existing = getJournalEntry(dateStr);
+
+  if (existing) {
+    db.run(
+      `UPDATE journal_entries SET content = ?, mood = ?, updated_at = ? WHERE entry_date = '${dateStr}'`,
+      [content, mood, now]
+    );
+  } else {
+    db.run(
+      `INSERT INTO journal_entries (entry_date, content, mood, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
+      [dateStr, content, mood, now, now]
+    );
+  }
+  saveDb();
+  const updated = getJournalEntry(dateStr);
+  if (updated) {
+    indexRecord('journal', updated.id, `Günlük - ${dateStr}`, updated.content || '', null, dateStr);
+  }
+  return updated;
+}
+
+export function searchJournal(queryStr) {
+  const query = (queryStr || '').toLowerCase();
+  const res = db.exec(`SELECT * FROM journal_entries WHERE LOWER(content) LIKE '%${query}%' ORDER BY entry_date DESC`);
+  return resultToObjects(res);
+}
+
+export function getAllJournalEntries() {
+  const res = db.exec('SELECT * FROM journal_entries ORDER BY entry_date DESC');
+  return resultToObjects(res);
+}
+
+// GÖREV BAĞLANTILARI & KİLİT (TASK LINKS - Görev 17)
+export function getTaskLinks(taskId) {
+  const res = db.exec(
+    `SELECT tl.*, 
+            st.title as source_title, st.status as source_status,
+            tt.title as target_title, tt.status as target_status
+     FROM task_links tl
+     LEFT JOIN tasks st ON st.id = tl.source_task_id
+     LEFT JOIN tasks tt ON tt.id = tl.target_task_id
+     WHERE tl.source_task_id = ${taskId} OR tl.target_task_id = ${taskId}`
+  );
+  const rows = resultToObjects(res);
+
+  const blockingMe = rows.filter((r) => r.target_task_id === Number(taskId) && r.link_type === 'blocks');
+  const blockedByMe = rows.filter((r) => r.source_task_id === Number(taskId) && r.link_type === 'blocks');
+
+  return {
+    blockingMe: blockingMe || [],
+    blockedByMe: blockedByMe || [],
+  };
+}
+
+export function addTaskLink(sourceTaskId, targetTaskId, linkType = 'blocks') {
+  const now = new Date().toISOString();
+  db.run(
+    `INSERT OR IGNORE INTO task_links (source_task_id, target_task_id, link_type, created_at) VALUES (?, ?, ?, ?)`,
+    [sourceTaskId, targetTaskId, linkType, now]
+  );
+  saveDb();
+  return getLastInserted('task_links');
+}
+
+export function deleteTaskLink(id) {
+  db.run(`DELETE FROM task_links WHERE id = ${id}`);
+  saveDb();
+  return true;
+}
+
+export function isTaskBlocked(taskId) {
+  const res = db.exec(
+    `SELECT tl.*, t.status, t.title FROM task_links tl
+     JOIN tasks t ON t.id = tl.source_task_id
+     WHERE tl.target_task_id = ${taskId} AND tl.link_type = 'blocks' AND t.status != 'done'`
+  );
+  const blockingTasks = resultToObjects(res) || [];
+  return {
+    isBlocked: blockingTasks.length > 0,
+    blockingTasks: blockingTasks,
+    blockers: blockingTasks,
+  };
 }
 
 // AYAR İŞLEMLERİ

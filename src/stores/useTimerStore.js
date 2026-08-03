@@ -11,6 +11,9 @@ export const useTimerStore = create((set, get) => ({
   totalDuration: 25 * 60,
   completedPomodoros: 0,
   currentSessionId: null,
+  lastEndedSession: null, // { session, task } for SessionEndModal (Görev 19)
+
+  closeSessionEndModal: () => set({ lastEndedSession: null }),
 
   setMode: (mode) => {
     get().pauseTimer();
@@ -59,7 +62,12 @@ export const useTimerStore = create((set, get) => ({
     const { mode, currentSessionId } = get();
 
     if (currentSessionId && window.electronAPI) {
-      await window.electronAPI.endSession(currentSessionId);
+      const endedSession = await window.electronAPI.endSession(currentSessionId);
+      const selectedTaskId = useTaskStore.getState().selectedTaskId;
+      const task = useTaskStore.getState().tasks.find((t) => t.id === selectedTaskId);
+      if (endedSession) {
+        set({ lastEndedSession: { session: endedSession, task } });
+      }
     }
 
     const pomodoro = useSettingsStore.getState().pomodoro;
@@ -95,10 +103,16 @@ export const useTimerStore = create((set, get) => ({
     const { mode, completedPomodoros, currentSessionId } = get();
     const pomodoroSettings = useSettingsStore.getState().pomodoro;
 
-    // End active session in database
+    // End active session in database and trigger session notes modal
     if (currentSessionId && window.electronAPI) {
-      await window.electronAPI.endSession(currentSessionId);
+      const endedSession = await window.electronAPI.endSession(currentSessionId);
       const selectedTaskId = useTaskStore.getState().selectedTaskId;
+      const task = useTaskStore.getState().tasks.find((t) => t.id === selectedTaskId);
+
+      if (endedSession) {
+        set({ lastEndedSession: { session: endedSession, task } });
+      }
+
       if (selectedTaskId) {
         useTaskStore.getState().fetchTaskSessions(selectedTaskId);
         useTaskStore.getState().fetchTasks();

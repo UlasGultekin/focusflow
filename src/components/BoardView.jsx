@@ -132,10 +132,10 @@ export default function BoardView({ onOpenAddModal }) {
                               {task.title}
                             </h4>
                             <div className="flex items-center gap-1">
-                              {blockers && (
+                              {blockers && Array.isArray(blockers) && blockers.length > 0 && (
                                 <span
                                   className="text-[10px] font-bold text-rose-500 bg-rose-500/10 px-1.5 py-0.5 rounded-md flex items-center gap-0.5"
-                                  title={`Kilitli: #${blockers[0]?.id} ${blockers[0]?.title}`}
+                                  title={`Kilitli: #${blockers[0]?.id || ''} ${blockers[0]?.title || ''}`}
                                 >
                                   <Lock className="w-3 h-3" /> #{blockers[0]?.id}
                                 </span>

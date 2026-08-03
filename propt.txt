@@ -1,130 +1,173 @@
-Harika bir seçim! Alt görevler (checklist), karmaşık işleri parçalara ayırarak hem motivasyonu artırır hem de ilerlemeyi somut şekilde gösterir. Mevcut altyapıya kusursuz oturacak şekilde Görev 18’in tüm detaylarını aşağıda hazırladım.
+İşte istediğin iki yeni özelliğin eksiksiz görev kartları. İkisi de mevcut veritabanı ve IPC yapısına sorunsuzca entegre olacak şekilde hazırlandı.
 
 ---
 
-## Görev 18: Görev İçinde Alt Görevler (Checklist)
+## Görev 19: Oturum Notları (Session Notes)
 
-**Amaç:** Ana görevleri daha küçük, tamamlanabilir adımlara bölmek. Her ana görevin altında sürükle-bırak ile sıralanabilen, tik atıldıkça tamamlanma yüzdesi güncellenen ve isteğe bağlı olarak ana görevi otomatik tamamlayabilen bir checklist sistemi.
+**Amaç:** Her pomodoro veya odaklanma oturumu sonunda, kullanıcının o seansta aklına gelen fikirleri hızlıca not almasını sağlamak. Notlar oturuma ve ilgili göreve bağlanır; sonradan görev detayında görüntülenebilir ve düzenlenebilir.
 
----
-
-### 18.1 Veritabanı Güncellemesi
-
-Yeni bir `subtasks` tablosu eklenir:
+### 19.1 Veritabanı Güncellemesi
+Mevcut `task_sessions` tablosuna yeni bir sütun eklenir:
 
 ```sql
-CREATE TABLE IF NOT EXISTS subtasks (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  task_id INTEGER NOT NULL,
-  title TEXT NOT NULL,
-  completed INTEGER DEFAULT 0,        -- 0 = false, 1 = true
-  sort_order INTEGER DEFAULT 0,
-  created_at TEXT DEFAULT (datetime('now')),
-  updated_at TEXT DEFAULT (datetime('now')),
-  FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+ALTER TABLE task_sessions ADD COLUMN notes TEXT DEFAULT '';
+```
+
+Bu sütun, oturum tamamlandığında veya duraklatıldığında alınan kısa notu saklar. Eğer ileride daha uzun notlar veya Markdown desteği istenirse `TEXT` yeterlidir.
+
+### 19.2 IPC Metodları
+- `updateSessionNotes(sessionId, notes)`: Belirtilen oturumun notlarını günceller, güncellenmiş satırı döndürür.
+- `getSessionNotes(sessionId)`: Oturuma ait notu döndürür. (Genellikle görev detayı oturum listesini çekerken zaten `task_sessions` satırları geldiği için bu metod opsiyoneldir.)
+
+### 19.3 Arayüz Gereksinimleri
+
+#### 19.3.1 Oturum Bitiş Mini Modalı
+- Pomodoro veya odaklanma oturumu herhangi bir şekilde sona erdiğinde (süre doldu, kullanıcı manuel durdurdu veya duraklattı), ekranın sağ alt köşesinde **küçük, çerçevesiz bir modal** belirir.
+- Modal boyutu yaklaşık 400x250px, temaya uygun yarı saydam arka plan ve hafif gölge.
+- İçerik:
+  - Başlık: “Oturum tamamlandı – [Görev Adı]” (eğer görev bağlıysa) veya “Odaklanma oturumu tamamlandı” (genel sayaç).
+  - Metin alanı: placeholder “Bu seansta aklına gelen fikirler, notlar…”. 3-4 satır yükseklikte, otomatik odaklanmış.
+  - Alt kısımda iki buton:
+    - “Kaydet ve Kapat” – notu veritabanına kaydeder, modalı kapatır.
+    - “Şimdilik Geç” – not kaydedilmeden modal kapanır. Bu durumda not alanı boş kalır.
+- Modal 15 saniye içinde herhangi bir etkileşim olmazsa otomatik olarak kapanır, içerik kaydedilmez.
+- Eğer oturum bir göreve bağlıysa ve kullanıcı not girip kaydederse, görev detayındaki oturum listesinde bu not anında görünür hale gelir.
+
+#### 19.3.2 Görev Detayında Oturum Notlarının Gösterimi
+- Görev detayının “Oturumlar” bölümünde (Görev 4’te oluşturulan kronolojik liste), her oturum satırının altında veya yanında küçük bir not simgesi (📝) görünür.
+- Not simgesine tıklandığında, satır genişler ve not içeriği okunabilir. Tekrar tıklayınca daralır (akordeon mantığı).
+- Not içeriği varsa simge dolgu, yoksa çizgi olur.
+- Not düzenleme: Genişletilmiş not alanına tıklanınca metin düzenlenebilir hale gelir. Değişiklikler anında `updateSessionNotes` IPC’si ile kaydedilir.
+
+#### 19.3.3 Oturum Notlarının Analiz ve Arama ile Entegrasyonu
+- Görev 20 (Gelişmiş Arama) ile birlikte, oturum notları da arama kapsamına alınır.
+- Analiz sayfasında oturum notlarının kelime sayısı veya not bırakılan oturum oranı gibi metrikler isteğe bağlı olarak gösterilebilir, ama şimdilik zorunlu değil.
+
+### 19.4 Tasarım Detayları
+- Mini modal, temanın rengine uygun: Soft Light’ta beyaz arka plan, hafif mavi gölge; Deep Dark’ta koyu arka plan, mor kenar çizgisi; Pastel Calm’da açık yeşil arka plan.
+- Metin alanı, temanın yazı rengi ve arka planıyla uyumlu, çerçevesiz.
+- Butonlar sade, yuvarlak köşeli. Kaydet butonu temanın vurgu renginde dolgulu, “Geç” butonu metin şeklinde veya ince çerçeveli.
+
+### 19.5 Test Adımları
+1. Bir göreve pomodoro başlat, sürenin bitmesini bekle veya manuel durdur.
+2. Mini modalın açıldığını doğrula.
+3. Not girip kaydet, görev detayına git ve oturum satırında not simgesinin dolduğunu gör.
+4. Simgeye tıkla, notun okunduğundan ve düzenlenebildiğinden emin ol.
+5. Boş bırakıp “Geç” dediğinde simgenin boş olduğunu kontrol et.
+6. Modalı 15 saniye bekleyerek otomatik kapanmayı test et.
+
+---
+
+## Görev 20: Gelişmiş Arama & Filtreleme
+
+**Amaç:** Sadece görev başlıklarında değil; tüm görevler, alt görevler, görev notları, genel notlar, günlük girişleri, oturum notları ve bağlı dosya adları üzerinde güçlü bir tam metin araması yapmak. Arama sonuçlarını kategori, durum, tarih aralığı gibi filtrelerle daraltabilmek.
+
+### 20.1 Veritabanı Güncellemesi: FTS5 Sanal Tablo
+SQLite’ın hızlı tam metin arama motoru FTS5 kullanılır. Aranabilir içerikleri tek bir sanal tabloda toplamak için aşağıdaki yapı oluşturulur:
+
+```sql
+CREATE VIRTUAL TABLE IF NOT EXISTS search_index USING fts5(
+  source_type,      -- 'task', 'subtask', 'task_note', 'general_note', 'journal', 'session_note', 'attachment'
+  source_id,        -- ilgili tablodaki kayıt ID'si
+  title,            -- görev başlığı, alt görev başlığı, not başlığı (varsa), günlük tarihi vb.
+  content,          -- ana metin: görev açıklaması, alt görev başlığı, not içeriği, günlük içeriği, oturum notu, dosya adı
+  task_id,          -- eğer bir göreve bağlıysa task_id (filtreleme ve bağlantı için)
+  date_info,        -- YYYY-MM-DD formatında ilişkili tarih (görev oluşturma, not tarihi, günlük tarihi, oturum başlangıcı)
+  status,           -- görev durumu (todo/in_progress/done), diğerleri için boş olabilir
+  extra_json        -- opsiyonel ek bilgiler (JSON)
 );
-
-CREATE INDEX IF NOT EXISTS idx_subtasks_task_id ON subtasks(task_id);
 ```
 
-**Opsiyonel** olarak ana görev tablosunda (`tasks`) alt görev davranışını belirleyen bir sütun:
+**İlk doldurma ve güncelleme stratejisi:**
+- Uygulama başlangıcında FTS tablosu yoksa oluşturulur ve mevcut tüm veriler indekslenir.
+- Her ekleme/güncelleme/silme işleminde ilgili kayıt `search_index` tablosunda da güncellenir (trigger veya uygulama kodu ile). Basitlik için uygulama seviyesinde, ilgili IPC metotlarının içinde senkronizasyon tercih edilebilir.
+- Arama yaparken kaynak türü ve ID kullanılarak orijinal kayda bağlantı kurulur.
 
-```sql
-ALTER TABLE tasks ADD COLUMN auto_complete_subtasks INTEGER DEFAULT 0; 
--- 1 ise tüm alt görevler tamamlandığında ana görev otomatik olarak "done" olur.
+İndeksleme fonksiyonu (ana süreç):
+- `rebuildSearchIndex()`: Tüm tabloları tarar, FTS tablosunu temizler ve yeniden doldurur. İsteğe bağlı olarak ayarlardan manuel tetiklenebilir.
+
+### 20.2 IPC Metodları
+- `searchAll(query, filters?)`: `query` FTS5 sorgusu olarak `search_index` üzerinde çalıştırılır. `filters` nesnesi opsiyonel olarak şunları içerebilir:
+  - `sourceTypes`: string[] (ör. ['task', 'journal'])
+  - `taskStatus`: string (todo/in_progress/done)
+  - `dateFrom`, `dateTo`: YYYY-MM-DD
+  - `taskId`: belirli bir göreve bağlı sonuçlar için.
+- `getSearchSuggestions(partialQuery)`: `search_index` üzerinde `LIKE` veya FTS5 prefix sorgusu ile otomatik tamamlama önerileri döndürür (en fazla 5-10 sonuç). Başlık ve içerikten kısa parçacıklar.
+- `rebuildSearchIndex()`: Manuel indeks yenileme.
+
+Dönen sonuç yapısı:
+```json
+{
+  "source_type": "task",
+  "source_id": 123,
+  "title": "Blog yazısını düzelt",
+  "snippet": "...taslağı gözden geçir ve <mark>düzelt</mark>...",
+  "date_info": "2026-08-04",
+  "status": "in_progress",
+  "task_id": 123
+}
 ```
+`snippet`, FTS5’in `snippet()` fonksiyonu ile eşleşen kelimenin etrafından alınan kısa metindir (HTML `<mark>` etiketleriyle vurgulanmış).
+
+### 20.3 Arayüz Gereksinimleri
+
+#### 20.3.1 Arama Girişi ve Komut Paleti
+- Uygulamanın her yerinden erişilebilen global bir kısayol: `Ctrl + Shift + F` (veya `Ctrl + P` komut paleti olarak).
+- Kısayola basıldığında ekranın ortasında büyük bir **Arama Paleti** açılır.
+- Palet yapısı:
+  - En üstte geniş bir arama inputu, otomatik odaklanmış.
+  - Inputa yazarken 300ms debounce ile `getSearchSuggestions` çağrılır ve inputun altında canlı öneriler listelenir (dropdown).
+  - Enter’a basınca veya “Tüm sonuçları gör” seçeneğine tıklanınca tam sonuç sayfasına yönlendirir.
+- Palette basit filtre butonları: “Görevler”, “Notlar”, “Günlük”, “Dosyalar” gibi chip butonlar, tıklandıkça filtre eklenir/çıkarılır.
+
+#### 20.3.2 Arama Sonuçları Sayfası
+- Tam ekran bir sayfa. Sol üstte arama kutusu (mevcut sorguyu gösterir, düzenlenebilir). Yanında filtre butonları.
+- Filtre paneli (isteğe bağlı açılır/kapanır):
+  - Kaynak türü checkbox’ları: Görevler, Alt Görevler, Görev Notları, Genel Notlar, Günlük Girişleri, Oturum Notları, Dosyalar.
+  - Görev durumu: Tümü, Yapılacak, Devam Eden, Tamamlanan (sadece görev kaynakları için aktif).
+  - Tarih aralığı: Başlangıç ve bitiş tarihi seçicileri.
+- Sonuç listesi, kaynak türüne göre gruplandırılır:
+  - Her grup başlığı: “Görevler (5)”, “Günlük Girişleri (2)” vb.
+  - Her sonuç kartı şunları içerir:
+    - Kaynak türü ikonu (📋 görev, 📝 not, 📔 günlük, ⏱️ oturum notu, 📎 dosya)
+    - Başlık (kalın)
+    - Vurgulanmış snippet (HTML render edilmiş, arama terimi sarı fosforlu işaretli)
+    - Tarih ve varsa durum etiketi
+    - Tıklanabilir alan: ilgili sayfaya/görev detayına/günlük gününe yönlendirir.
+- Sonuç bulunamazsa temaya uygun boş durum illüstrasyonu ve “Aramanızla eşleşen sonuç bulunamadı” mesajı.
+
+#### 20.3.3 Entegrasyon ve Yönlendirme
+- Görev sonucuna tıklayınca o görevin detay sayfasına gidilir (veya board’da ilgili kart vurgulanır).
+- Günlük girişi sonucuna tıklayınca Günlük sekmesinde o tarihe gidilir.
+- Genel not sonucuna tıklayınca Genel Notlar sayfasında o not açılır.
+- Oturum notu sonucuna tıklayınca ilgili görevin detayındaki oturumlar bölümüne ve o oturuma scroll yapılır.
+- Dosya sonucuna tıklayınca dosya sistemde açılır (`shell.openPath`).
+
+### 20.4 Zustand Store
+`useSearchStore`:
+- `query`, `filters`, `results`, `isSearching`, `suggestions`.
+- `search(query, filters)` → IPC çağrısı, sonuçları store’a yazar.
+- `updateFilters(filters)`.
+- `clearSearch()`.
+
+### 20.5 Performans Optimizasyonu
+- FTS5 kullanımı milyonlarca kayıtta bile çok hızlıdır; masaüstü uygulaması için fazlasıyla yeterlidir.
+- Arama debounce ile yapılır (300ms).
+- Sonuçlar sanal liste (react-window veya react-virtuoso) ile render edilebilir, ancak şimdilik sonuç sayısı genelde düşük olacağından basit liste yeterlidir.
+
+### 20.6 Tasarım Detayları
+- Arama paleti: Büyük, ortalanmış, yarı saydam koyu overlay. Input alanı büyük font, yuvarlak köşe, gölge.
+- Sonuç sayfası: Sol kenarda filtre paneli, ana alan temiz liste. Snippet’te vurgu rengi temanın vurgu rengi olabilir.
+- Boş durum: Sade ve motive edici ikon.
+
+### 20.7 Test Adımları
+1. Bir görev, bir alt görev, bir günlük girişi ve bir göreve bağlı oturum notu oluştur.
+2. `Ctrl+Shift+F` ile arama paletini aç, anahtar kelime yaz. Önerilerin çıktığını gör.
+3. Enter ile sonuç sayfasına git. Filtreleri değiştir: sadece günlük, sadece görevler vb. Sonuçların doğru filtrelendiğini kontrol et.
+4. Sonuçlara tıklayarak doğru sayfalara yönlendirildiğini doğrula.
+5. İndeksi yeniden oluşturma butonunu test et.
+6. Hiç sonuç olmayan bir sorgu yap, boş durum ekranını gör.
 
 ---
 
-### 18.2 IPC Katmanı (Ana Süreç)
-
-Aşağıdaki IPC işleyicileri `ipcMain.handle` ile kaydedilir ve `preload.js` üzerinden `window.electronAPI` altında renderer’a sunulur:
-
-- `getSubtasks(taskId)` → `subtasks` tablosundan `sort_order` ile sıralanmış alt görev listesini döndürür.
-- `addSubtask(taskId, title)` → Yeni alt görev ekler; `sort_order`, o ana görevdeki en yüksek değerin bir fazlası olarak otomatik atanır. Eklenen satırın tamamını döndürür.
-- `updateSubtask(id, data)` → `data` nesnesi `title`, `completed` veya `sort_order` alanlarından birini içerebilir. `updated_at` güncellenir. Güncellenmiş kaydı döndürür.
-- `deleteSubtask(id)` → Alt görevi siler, başarı durumu döndürür.
-- `reorderSubtasks(taskId, orderedIds)` → Verilen sıralı ID dizisine göre `sort_order` değerlerini günceller (toplu güncelleme). Başarı durumu döndürür.
-- `updateTaskAutoComplete(taskId, value)` → `tasks` tablosundaki `auto_complete_subtasks` alanını günceller.
-
-**Önemli:** `updateSubtask` ile bir alt görevin `completed` değeri değiştiğinde, ana süreç tarafı şu kontrolleri yapmalıdır:
-
-1. Eğer alt görev tamamlandı olarak işaretlenmişse ve ana görev durumu (`tasks.status`) `'todo'` ise, ana görevi otomatik olarak `'in_progress'` olarak güncelle.
-2. Eğer ana görevin `auto_complete_subtasks = 1` ise ve tüm alt görevler tamamlanmışsa, ana görevi `'done'` olarak güncelle ve bu işlemi renderer’a bildir (böylece board/liste anında güncellenir).
-3. Bu mantık ana süreçte, ilgili `ipcMain.handle` içerisinde veya ayrı bir yardımcı fonksiyon aracılığıyla gerçekleştirilir.
-
----
-
-### 18.3 Durum Yönetimi (Zustand Store)
-
-Mevcut `useTaskStore` veya yeni bir `useSubtaskStore` oluşturulabilir (tek bir store yeterlidir). Store’da:
-
-- `subtasks: Record<number, Subtask[]>` — görev ID’sine göre alt görev listelerini tutar.
-- `loadSubtasks(taskId)` → IPC ile çekip store’a yazar.
-- `addSubtask(taskId, title)`, `toggleSubtask(id)`, `removeSubtask(id)`, `reorder(taskId, newOrder)` gibi eylemler.
-- `getTaskProgress(taskId)` → store’dan hesaplanan `{ completed, total, percentage }` döner.
-
-Ana görevin durum ve otomatik tamamlama tetiklemeleri için IPC cevapları store’daki `tasks` listesini de günceller.
-
----
-
-### 18.4 Arayüz Gereksinimleri
-
-#### 18.4.1 Görev Detay Paneli – Alt Görevler Bölümü
-
-- Görev detayının içinde, tahmini süre ve bağlantıların altında **“Alt Görevler”** başlıklı bir bölüm yer alır.
-- Bölümün üst kısmında bir **ilerleme çubuğu** ve yanında metin: `"2 / 5 tamamlandı (%40)"`. Çubuk ince, temaya uygun dolgu renginde (Soft Light’ta yumuşak mavi, Deep Dark’ta mor vs.).
-- Hemen altında **alt görev listesi** yer alır. Her satır şunları içerir:
-  - **Sürükleme kolu** (6 nokta veya ikon) – satırın solunda, yalnızca fare üzerine gelince görünür. Kullanıcı bu kolu tutup sürükleyerek sıralamayı değiştirebilir. (Board’da kullanılan `@hello-pangea/dnd` ile aynı kütüphane, `DragDropContext` + `Droppable` + `Draggable` bileşenleri kullanılır.)
-  - **Checkbox** – işaretlendiğinde alt görev tamamlanır. Checkbox’ın stili temaya uygun (yuvarlak, içi tikli).
-  - **Alt görev başlığı** – üzerine çift tıklandığında veya yanındaki düzenleme ikonuna tıklandığında satır içi düzenleme moduna geçer (inline edit). Metin girilip Enter’a basınca veya odak kaybedince kaydedilir. Tamamlanmış alt görevlerin üstü çizili ve rengi soluk görünür.
-  - **Silme butonu** – çöp kutusu ikonu, satırın en sağında, yalnızca fareyle üzerine gelindiğinde görünür.
-- Listenin en altında bir **“Alt görev ekle”** satırı bulunur (placeholder: “+ Yeni adım ekle”). Tıklanınca yeni bir satır açılır, kullanıcı başlığı yazar ve Enter ile ekler.
-
-#### 18.4.2 Sürükle-Bırak Sıralama
-
-- `@hello-pangea/dnd` kullanılarak alt görev listesi bir `Droppable` konteyner, her alt görev `Draggable` öğedir.
-- Sürükleme tamamlandığında (`onDragEnd`), yeni sıralama ID dizisi `reorderSubtasks` IPC çağrısı ile ana sürece gönderilir.
-- Optimistik güncelleme yapılır (sıralama anında store’a yansıtılır, hata durumunda geri alınır).
-
-#### 18.4.3 Otomatik Tamamlama Ayarı
-
-- Görev detayının alt görevler bölümünün hemen üstünde veya görev ayarlarında minik bir toggle: **“Tüm adımlar bitince görevi otomatik tamamla”**. Bu toggle, `auto_complete_subtasks` değerini değiştirir.
-- Varsayılan olarak kapalıdır.
-
-#### 18.4.4 Board ve Liste Görünümüne Yansımalar
-
-- Board kartında ve liste öğesinde, eğer görevin alt görevleri varsa, görev başlığının altında ince bir ilerleme çubuğu ve `2/5` gibi bir ibare görünür.
-- Tamamlanmış alt görevler ana görevi etkilemez ancak ilerleme çubuğuyla motivasyon sağlar.
-
-#### 18.4.5 Özel Durumlar ve İncelikler
-
-- Bir alt görevin tamamlanmasıyla ana görev `todo` → `in_progress` otomatik geçişi, kullanıcıya bildirilmez, sadece durum güncellenir (board’da kart yer değiştirir).
-- `auto_complete_subtasks` aktif olan bir görevde tüm alt görevler tamamlandığında, ana görev `done` olur ve bu durum masaüstü bildirimi ile kullanıcıya haber verilir: “Tüm adımlar tamamlandı! ‘Blog yazısı’ görevi otomatik olarak tamamlandı.” Bildirim opsiyonu ayarlarda kapatılabilir.
-- Eğer kullanıcı manuel olarak ana görevi `done` yaparsa, alt görevlerin tamamlanma durumu değişmez; hepsi olduğu gibi kalır. Bu sayede kısmi tamamlanan işler de kapatılabilir.
-
----
-
-### 18.5 Tasarım Detayları
-
-- **İlerleme çubuğu:** yükseklik 4-6px, border-radius 2px. Dolgu rengi temanın vurgu rengi, boş kısım soluk gri.
-- **Checkbox:** Lucide `CheckCircle` veya `Circle` ikonları kullanılabilir. Tamamlanmışsa `CheckCircle` dolgulu ve yeşil tonda.
-- **Satır hover efekti:** Arka plan yarı saydam hale gelir, sürükleme kolu ve silme butonu belirginleşir.
-- **Düzenleme modu:** Input alanı satırın tamamını kaplar, otomatik odaklanır, kenarlığı temanın vurgu rengindedir.
-- **Boş liste:** “Bu görev için henüz alt adım eklenmedi. Büyük işleri küçük parçalara bölmek ilerlemeyi hissetmeni sağlar.” şeklinde motive edici bir boş durum mesajı.
-
----
-
-### 18.6 Entegrasyon ve Test Adımları
-
-1. Görev detayına alt görevler bölümünü ekle.
-2. Ekleme, düzenleme, silme, tamamlama işlemlerini sırasıyla test et.
-3. Sürükle-bırak ile sıralamayı değiştir, sayfayı yenileyip sıranın korunduğunu doğrula.
-4. Otomatik durum geçişlerini kontrol et: `todo` olan bir görevde ilk alt görev tamamlandığında `in_progress`’a geçtiğini doğrula.
-5. `auto_complete_subtasks` açıkken tüm alt görevleri tamamla, ana görevin `done` olduğunu ve bildirim geldiğini test et.
-6. Board görünümünde karttaki ilerleme çubuğunun doğru güncellendiğini gözlemle.
-7. Bir alt görevi silince yüzdelik hesabının doğru güncellendiğini kontrol et.
-
----
-
-Bu görev tamamlandığında, FocusFlow’un görev yönetimi bir seviye daha derinleşecek. Artık karmaşık projeleri adım adım ilerlerken izleyebilecek, hangi noktada olduğunu anında görebileceksin. Sırada istersen **Hızlı Yakalama Penceresi** veya **Boşta Kalma Uyarısı** gibi özellikleri de aynı detayda hazırlamaya hazırım! 🚀
+Bu iki görev, FocusFlow’un hem **anı yakalama** hem de **veriyi keşfetme** yeteneklerini radikal biçimde artıracak. Görev 19 tamamlandığında hiçbir parlak fikrin kaybolmayacak; Görev 20 tamamlandığında aradığın her şeye saniyeler içinde ulaşacaksın. Bir sonraki isteğini bekliyorum! 🚀

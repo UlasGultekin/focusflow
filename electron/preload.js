@@ -14,11 +14,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
   deleteSubtask: (id) => ipcRenderer.invoke('subtasks:delete', id),
   reorderSubtasks: (taskId, orderedIds) => ipcRenderer.invoke('subtasks:reorder', taskId, orderedIds),
 
-  // Sessions
+  // Sessions (Görev 19)
   startSession: (taskId, type) => ipcRenderer.invoke('sessions:start', taskId, type),
   endSession: (sessionId) => ipcRenderer.invoke('sessions:end', sessionId),
+  updateSessionNotes: (sessionId, notes) => ipcRenderer.invoke('sessions:updateNotes', sessionId, notes),
   getTaskSessions: (taskId) => ipcRenderer.invoke('sessions:getTask', taskId),
   getAllSessions: (startDate, endDate) => ipcRenderer.invoke('sessions:getAll', startDate, endDate),
+
+  // Search & Command Palette (Görev 20)
+  searchAll: (query, filters) => ipcRenderer.invoke('search:query', query, filters),
+  getSearchSuggestions: (query) => ipcRenderer.invoke('search:suggestions', query),
+  rebuildSearchIndex: () => ipcRenderer.invoke('search:rebuild'),
+  onTriggerGlobalSearch: (callback) => ipcRenderer.on('trigger-global-search', (_, data) => callback(data)),
 
   // Notes
   getNotes: (taskId) => ipcRenderer.invoke('notes:get', taskId),

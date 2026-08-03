@@ -152,8 +152,9 @@ export default function TaskDetail({ onEditTask, onShareTask }) {
       await endSession();
     } else {
       if (isBlockedInfo.isBlocked) {
+        const blockerTitle = (isBlockedInfo.blockers && isBlockedInfo.blockers[0]?.title) || (isBlockedInfo.blockingTasks && isBlockedInfo.blockingTasks[0]?.title) || 'Ön Koşul';
         alert(
-          `Bu görev engelleniyor! Başlamadan önce ön koşul görevin (${isBlockedInfo.blockers[0]?.title}) tamamlanması gerekmektedir.`
+          `Bu görev engelleniyor! Başlamadan önce ön koşul görevin (${blockerTitle}) tamamlanması gerekmektedir.`
         );
         return;
       }
@@ -273,7 +274,7 @@ export default function TaskDetail({ onEditTask, onShareTask }) {
           <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-500 text-xs font-semibold flex items-center gap-2">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>
-              Bu görev engelleniyor: #{isBlockedInfo.blockers[0]?.id} {isBlockedInfo.blockers[0]?.title} tamamlanmalıdır.
+              Bu görev engelleniyor: #{ (isBlockedInfo.blockers && isBlockedInfo.blockers[0]?.id) || (isBlockedInfo.blockingTasks && isBlockedInfo.blockingTasks[0]?.id) } { (isBlockedInfo.blockers && isBlockedInfo.blockers[0]?.title) || (isBlockedInfo.blockingTasks && isBlockedInfo.blockingTasks[0]?.title) } tamamlanmalıdır.
             </span>
           </div>
         )}
@@ -543,19 +544,19 @@ export default function TaskDetail({ onEditTask, onShareTask }) {
 
         {/* Blocking Me List */}
         <div className="space-y-2">
-          {links.blockingMe.length > 0 && (
+          {(links?.blockingMe || []).length > 0 && (
             <div>
               <span className="text-[10px] font-bold text-rose-500 uppercase block mb-1">
                 🔒 Bu Görevi Engelleyen Ön Koşullar:
               </span>
-              {links.blockingMe.map((l) => (
+              {(links?.blockingMe || []).map((l) => (
                 <div
                   key={l.id}
                   onClick={() => selectTask(l.target_task_id)}
                   className="flex items-center justify-between p-2 rounded-xl border border-rose-500/30 bg-rose-500/5 text-xs cursor-pointer hover:border-rose-500"
                 >
                   <span className="font-semibold text-app-primary truncate">
-                    #{l.target_task_id} {l.target_title} ({l.target_status})
+                    #{l.target_task_id} {l.target_title || 'Görev'} ({l.target_status || 'bekliyor'})
                   </span>
                   <button
                     onClick={(e) => {
@@ -571,19 +572,19 @@ export default function TaskDetail({ onEditTask, onShareTask }) {
             </div>
           )}
 
-          {links.blockedByMe.length > 0 && (
+          {(links?.blockedByMe || []).length > 0 && (
             <div>
               <span className="text-[10px] font-bold text-indigo-500 uppercase block mb-1">
                 ➡️ Bu Görevin Tamamlanmasını Bekleyenler:
               </span>
-              {links.blockedByMe.map((l) => (
+              {(links?.blockedByMe || []).map((l) => (
                 <div
                   key={l.id}
                   onClick={() => selectTask(l.source_task_id)}
                   className="flex items-center justify-between p-2 rounded-xl border border-indigo-500/30 bg-indigo-500/5 text-xs cursor-pointer hover:border-indigo-500"
                 >
                   <span className="font-semibold text-app-primary truncate">
-                    #{l.source_task_id} {l.source_title} ({l.source_status})
+                    #{l.source_task_id} {l.source_title || 'Görev'} ({l.source_status || 'bekliyor'})
                   </span>
                   <button
                     onClick={(e) => {
@@ -599,7 +600,7 @@ export default function TaskDetail({ onEditTask, onShareTask }) {
             </div>
           )}
 
-          {links.blockingMe.length === 0 && links.blockedByMe.length === 0 && (
+          {(links?.blockingMe || []).length === 0 && (links?.blockedByMe || []).length === 0 && (
             <p className="text-[11px] text-app-muted text-center py-2">
               Henüz tanımlanmış bir görev bağlantısı yok.
             </p>

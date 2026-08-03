@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutList, Kanban, Calendar, GraduationCap, Flame, BookHeart, NotebookPen, BarChart3, Settings, Sparkles, Moon, Sun } from 'lucide-react';
+import { LayoutList, Kanban, Calendar, GraduationCap, Flame, BookHeart, NotebookPen, BarChart3, Search, Settings, Sparkles, Moon, Sun } from 'lucide-react';
 import { useSettingsStore } from '../stores/useSettingsStore';
 
 export default function Sidebar({ currentTab, setCurrentTab }) {
@@ -13,6 +13,7 @@ export default function Sidebar({ currentTab, setCurrentTab }) {
     { id: 'habits', label: 'Alışkanlıklar', icon: Flame },
     { id: 'journal', label: 'Günlük (Journal)', icon: BookHeart },
     { id: 'notes', label: 'Not Defteri', icon: NotebookPen },
+    { id: 'search', label: 'Gelişmiş Arama', icon: Search },
     { id: 'analytics', label: 'Analiz & Raporlar', icon: BarChart3 },
     { id: 'settings', label: 'Ayarlar', icon: Settings },
   ];

@@ -10,12 +10,17 @@ import CoursesView from './components/CoursesView';
 import HabitsView from './components/HabitsView';
 import JournalView from './components/JournalView';
 import NotesView from './components/NotesView';
+import SearchView from './components/SearchView';
 import AnalyticsView from './components/AnalyticsView';
 import SettingsView from './components/SettingsView';
+import CommandPaletteModal from './components/CommandPaletteModal';
+import SessionEndModal from './components/SessionEndModal';
 import YesterdaySummaryToast from './components/YesterdaySummaryToast';
 import TaskShareModal from './components/TaskShareModal';
 import { useTaskStore } from './stores/useTaskStore';
 import { useSettingsStore } from './stores/useSettingsStore';
+import { useSearchStore } from './stores/useSearchStore';
+import { useTimerStore } from './stores/useTimerStore';
 
 export default function App() {
   const [currentTab, setCurrentTab] = useState('tasks');
@@ -25,10 +30,31 @@ export default function App() {
 
   const fetchSettings = useSettingsStore((s) => s.fetchSettings);
   const fetchTasks = useTaskStore((s) => s.fetchTasks);
+  const selectTask = useTaskStore((s) => s.selectTask);
+
+  const { openCommandPalette, toggleCommandPalette } = useSearchStore();
+  const { lastEndedSession, closeSessionEndModal } = useTimerStore();
 
   useEffect(() => {
     fetchSettings();
     fetchTasks();
+
+    // Listen for Ctrl+Shift+F global shortcut from Electron IPC
+    if (window.electronAPI && window.electronAPI.onTriggerGlobalSearch) {
+      window.electronAPI.onTriggerGlobalSearch(() => {
+        openCommandPalette();
+      });
+    }
+
+    // Keyboard shortcut for Ctrl+Shift+F or Ctrl+P inside browser
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        toggleCommandPalette();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   const handleOpenAddModal = () => {
@@ -39,6 +65,32 @@ export default function App() {
   const handleOpenEditModal = (task) => {
     setTaskToEdit(task);
     setIsTaskModalOpen(true);
+  };
+
+  const handleSearchResultNavigation = (sourceType, sourceId, taskId, dateInfo) => {
+    if (sourceType === 'search-page') {
+      setCurrentTab('search');
+      return;
+    }
+
+    if (taskId || sourceType === 'task' || sourceType === 'subtask' || sourceType === 'task_note' || sourceType === 'attachment') {
+      const targetId = taskId || sourceId;
+      selectTask(targetId);
+      setCurrentTab('tasks');
+    } else if (sourceType === 'journal') {
+      setCurrentTab('journal');
+    } else if (sourceType === 'general_note') {
+      setCurrentTab('notes');
+    } else if (sourceType === 'session_note') {
+      if (taskId) {
+        selectTask(taskId);
+        setCurrentTab('tasks');
+      } else {
+        setCurrentTab('tasks');
+      }
+    } else {
+      setCurrentTab('search');
+    }
   };
 
   return (
@@ -85,12 +137,29 @@ export default function App() {
 
         {currentTab === 'notes' && <NotesView />}
 
+        {currentTab === 'search' && (
+          <SearchView onNavigate={handleSearchResultNavigation} />
+        )}
+
         {currentTab === 'analytics' && <AnalyticsView />}
 
         {currentTab === 'settings' && <SettingsView />}
       </main>
 
-      {/* Modals & Toasts */}
+      {/* Modals & Overlays */}
+      <CommandPaletteModal onNavigate={handleSearchResultNavigation} />
+
+      {lastEndedSession && (
+        <SessionEndModal
+          session={lastEndedSession.session}
+          task={lastEndedSession.task}
+          onClose={closeSessionEndModal}
+          onSave={() => {
+            fetchTasks();
+          }}
+        />
+      )}
+
       <TaskModal
         isOpen={isTaskModalOpen}
         onClose={() => setIsTaskModalOpen(false)}

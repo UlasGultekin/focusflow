@@ -15,8 +15,12 @@ import {
   reorderSubtasks,
   startSession,
   endSession,
+  updateSessionNotes,
   getTaskSessions,
   getAllSessions,
+  searchAll,
+  getSearchSuggestions,
+  rebuildSearchIndex,
   getNotes,
   addNote,
   updateNote,
@@ -50,6 +54,11 @@ import {
 } from './database.js';
 
 const { app, BrowserWindow, ipcMain, Tray, Menu, globalShortcut, Notification, dialog, nativeImage, shell } = electron;
+
+// Disable Chromium GPU Shader & Disk Cache to prevent Windows file lock warnings
+app.commandLine.appendSwitch('disable-gpu-shader-disk-cache');
+app.commandLine.appendSwitch('disable-gpu-program-cache');
+app.commandLine.appendSwitch('disable-http-cache');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -176,6 +185,15 @@ function registerGlobalShortcuts() {
         }
       }
     });
+
+    // Global Search Shortcut (Ctrl+Shift+F)
+    globalShortcut.register('Ctrl+Shift+F', () => {
+      if (mainWindow) {
+        if (!mainWindow.isVisible()) mainWindow.show();
+        mainWindow.focus();
+        mainWindow.webContents.send('trigger-global-search', true);
+      }
+    });
   } catch (err) {
     console.error('Kısayol tuşu kaydedilemedi:', err);
   }
@@ -196,11 +214,17 @@ function setupIPCHandlers() {
   ipcMain.handle('subtasks:delete', (_, id) => deleteSubtask(id));
   ipcMain.handle('subtasks:reorder', (_, taskId, orderedIds) => reorderSubtasks(taskId, orderedIds));
 
-  // Sessions
+  // Sessions (Görev 19)
   ipcMain.handle('sessions:start', (_, taskId, type) => startSession(taskId, type));
   ipcMain.handle('sessions:end', (_, sessionId) => endSession(sessionId));
+  ipcMain.handle('sessions:updateNotes', (_, sessionId, notes) => updateSessionNotes(sessionId, notes));
   ipcMain.handle('sessions:getTask', (_, taskId) => getTaskSessions(taskId));
   ipcMain.handle('sessions:getAll', (_, startDate, endDate) => getAllSessions(startDate, endDate));
+
+  // Search & Command Palette (Görev 20)
+  ipcMain.handle('search:query', (_, query, filters) => searchAll(query, filters));
+  ipcMain.handle('search:suggestions', (_, query) => getSearchSuggestions(query));
+  ipcMain.handle('search:rebuild', () => rebuildSearchIndex());
 
   // Notes
   ipcMain.handle('notes:get', (_, taskId) => getNotes(taskId));
