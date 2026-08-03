@@ -50,6 +50,17 @@ FocusFlow; Electron, React 19, Vite, Tailwind CSS ve sql.js (WebAssembly SQLite)
 - Yeşil canlı ilerleme çubuğu ve tamamlama oranı (`2 / 5 tamamlandı %40`).
 - Adımlar bittiğinde ana görevi otomatik tamamlama seçeneği.
 
+### 10. 📝 Oturum Notları (Session Notes)
+- Pomodoro veya odaklanma seansı tamamlandığında beliren **15 saniyelik geri sayımlı Not Modalı**.
+- Seans esnasında akla gelen fikirleri anında kaydetme.
+- Görev detayında oturum notlarının kronolojik gösterimi ve satır içi düzenleme.
+
+### 11. 🔍 Gelişmiş Arama & Komut Paleti (`Ctrl + Shift + F`)
+- Her yerden erişilebilen **`Ctrl + Shift + F` Komut Paleti**.
+- Canlı arama önerileri (suggestions) ve filtre çipleri (Görevler, Notlar, Günlük, Oturumlar, Dosyalar).
+- Fosforlu `<mark>` metin vurgulu sonuçlar sayfası ve doğrudan içeriğe yönlendirme.
+- **"İndeksi Yenile"** ile tüm veritabanını anında yeniden indeksleme.
+
 ### 🎨 Tema & Sistem Tepsisi (Tray)
 - **Soft Light**, **Deep Dark** ve **Pastel Calm** renk temaları.
 - Sistem tepsisinde (Tray) arka planda çalışma ve `Ctrl+Shift+Space` küresel kısayol tuşu.
@@ -82,7 +93,6 @@ Uygulamayı canlı sıcak yeniden yükleme (HMR) ile başlatmak için:
 ```bash
 npm run dev
 ```
-*Bu komut Vite geliştirici sunucusunu başlatır ve ardından Electron masaüstü penceresini otomatik olarak açar.*
 
 ### 5. Production Masaüstü Paketi Derleme (Build)
 Uygulamanın çalıştırılabilir `.exe` (Windows) paketini derlemek için:
