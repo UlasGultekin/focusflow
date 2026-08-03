@@ -1,7 +1,26 @@
 import React, { useState } from 'react';
-import { Settings, Sun, Moon, Sparkles, Database, FileSpreadsheet, Keyboard, Shield, Save, Check } from 'lucide-react';
+import {
+  Settings,
+  Sun,
+  Moon,
+  Sparkles,
+  Database,
+  FileSpreadsheet,
+  Keyboard,
+  Shield,
+  Save,
+  Check,
+  Trash2,
+  AlertTriangle,
+  Calendar,
+  RefreshCw,
+} from 'lucide-react';
 import { useSettingsStore } from '../stores/useSettingsStore';
 import { useTaskStore } from '../stores/useTaskStore';
+import { useHabitStore } from '../stores/useHabitStore';
+import { useJournalStore } from '../stores/useJournalStore';
+import { useCourseStore } from '../stores/useCourseStore';
+import { useSearchStore } from '../stores/useSearchStore';
 
 export default function SettingsView() {
   const {
@@ -15,7 +34,7 @@ export default function SettingsView() {
     updatePomodoroSettings,
   } = useSettingsStore();
 
-  const { tasks } = useTaskStore();
+  const { tasks, fetchTasks } = useTaskStore();
 
   const [focusDur, setFocusDur] = useState(pomodoro.focus_duration || 25);
   const [shortBreak, setShortBreak] = useState(pomodoro.short_break || 5);
@@ -25,6 +44,23 @@ export default function SettingsView() {
 
   const [isSavedPomodoro, setIsSavedPomodoro] = useState(false);
   const [isSavedHotkey, setIsSavedHotkey] = useState(false);
+
+  // Date Range Cleanup States
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [isDateCleanupSuccess, setIsDateCleanupSuccess] = useState(false);
+
+  // Full Reset Confirmation Modal State
+  const [isFullResetModalOpen, setIsFullResetModalOpen] = useState(false);
+  const [confirmInputText, setConfirmInputText] = useState('');
+
+  const refreshAllStores = async () => {
+    await fetchTasks('all');
+    if (useHabitStore.getState().fetchHabits) await useHabitStore.getState().fetchHabits();
+    if (useJournalStore.getState().fetchAllEntries) await useJournalStore.getState().fetchAllEntries();
+    if (useCourseStore.getState().fetchCourses) await useCourseStore.getState().fetchCourses();
+    if (useSearchStore.getState().rebuildIndex) await useSearchStore.getState().rebuildIndex();
+  };
 
   const handleSavePomodoro = async (e) => {
     e.preventDefault();
@@ -55,6 +91,7 @@ export default function SettingsView() {
     if (window.electronAPI) {
       if (confirm('Veritabanı yedeğini içe aktarmak mevcut verileri değiştirecektir. Devam etmek istiyor musunuz?')) {
         await window.electronAPI.importDatabase();
+        await refreshAllStores();
       }
     }
   };
@@ -63,10 +100,55 @@ export default function SettingsView() {
     if (window.electronAPI && tasks.length > 0) {
       const headers = 'ID,Başlık,Açıklama,Tahmini Süre (dk),Öncelik,Kategori,Durum,Oluşturulma Tarihi\n';
       const rows = tasks.map((t) =>
-        `"${t.id}","${t.title.replace(/"/g, '""')}","${(t.description || '').replace(/"/g, '""')}","${t.estimated_minutes}","${t.priority}","${t.category}","${t.status}","${t.created_at}"`
+        `"${t.id}","${(t.title || '').replace(/"/g, '""')}","${(t.description || '').replace(/"/g, '""')}","${t.estimated_minutes}","${t.priority}","${t.category}","${t.status}","${t.created_at}"`
       ).join('\n');
       const csvContent = headers + rows;
       await window.electronAPI.exportCSV(csvContent, 'focusflow-tasks.csv');
+    }
+  };
+
+  // Tarih Aralığına Göre Silme
+  const handleClearByDateRange = async (e) => {
+    e.preventDefault();
+    if (!startDate || !endDate) {
+      alert('Lütfen geçerli bir başlangıç ve bitiş tarihi seçin.');
+      return;
+    }
+
+    if (startDate > endDate) {
+      alert('Başlangıç tarihi bitiş tarihinden sonra olamaz.');
+      return;
+    }
+
+    if (
+      confirm(
+        `${startDate} - ${endDate} tarihleri arasındaki tüm görevler, seanslar, notlar ve günlükler silinecektir. Emin misiniz?`
+      )
+    ) {
+      if (window.electronAPI && window.electronAPI.clearDataByDateRange) {
+        await window.electronAPI.clearDataByDateRange(startDate, endDate);
+        await refreshAllStores();
+        setIsDateCleanupSuccess(true);
+        setTimeout(() => setIsDateCleanupSuccess(false), 3000);
+        setStartDate('');
+        setEndDate('');
+      }
+    }
+  };
+
+  // Tüm Verileri Sıfırla (Hard Reset)
+  const handleConfirmFullReset = async () => {
+    if (confirmInputText.trim().toUpperCase() !== 'TEMİZLE') {
+      alert('Lütfen silme işlemini onaylamak için "TEMİZLE" yazın.');
+      return;
+    }
+
+    if (window.electronAPI && window.electronAPI.clearAllData) {
+      await window.electronAPI.clearAllData();
+      await refreshAllStores();
+      setIsFullResetModalOpen(false);
+      setConfirmInputText('');
+      alert('Tüm veriler başarıyla temizlendi ve uygulama sıfırlandı.');
     }
   };
 
@@ -84,7 +166,7 @@ export default function SettingsView() {
       </div>
 
       <div className="p-6 space-y-6 max-w-3xl">
-        {/* 1. Tema & Görünüm Seçenekleri (Görev 8) */}
+        {/* 1. Tema & Görünüm Seçenekleri */}
         <div className="bg-app-surface border border-app rounded-2xl p-5 shadow-xs space-y-4">
           <h3 className="text-sm font-bold text-app-primary flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-app-accent" /> Tema & Görünüm Modları
@@ -218,7 +300,7 @@ export default function SettingsView() {
           </div>
         </form>
 
-        {/* 3. Global Kısayol Tuşu (Görev 9) */}
+        {/* 3. Global Kısayol Tuşu */}
         <form onSubmit={handleSaveHotkey} className="bg-app-surface border border-app rounded-2xl p-5 shadow-xs space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold text-app-primary flex items-center gap-2">
@@ -250,7 +332,7 @@ export default function SettingsView() {
           </div>
         </form>
 
-        {/* 4. Veri Yönetimi & Yedekleme (Görev 10) */}
+        {/* 4. Veri Yönetimi & Yedekleme */}
         <div className="bg-app-surface border border-app rounded-2xl p-5 shadow-xs space-y-4">
           <h3 className="text-sm font-bold text-app-primary flex items-center gap-2">
             <Database className="w-4 h-4 text-indigo-500" /> Veri Kalıcılığı, İçe/Dışa Aktarma
@@ -282,7 +364,137 @@ export default function SettingsView() {
             </button>
           </div>
         </div>
+
+        {/* 5. VERİ TEMİZLEME & SIFIRLAMA (YENİ ÖZELLİK) */}
+        <div className="bg-app-surface border border-rose-500/30 rounded-2xl p-5 shadow-xs space-y-5">
+          <div className="flex items-center justify-between border-b border-app pb-3">
+            <h3 className="text-sm font-bold text-rose-500 flex items-center gap-2">
+              <Trash2 className="w-4 h-4" /> Veri Temizleme & Sıfırlama
+            </h3>
+            {isDateCleanupSuccess && (
+              <span className="text-xs font-semibold text-emerald-500 flex items-center gap-1">
+                <Check className="w-3.5 h-3.5" /> Seçili Veriler Silindi
+              </span>
+            )}
+          </div>
+
+          {/* Tarih Aralığına Göre Silme Formu */}
+          <form onSubmit={handleClearByDateRange} className="space-y-3">
+            <h4 className="text-xs font-bold text-app-primary flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5 text-app-accent" /> Tarih Aralığına Göre Kayıtları Sil
+            </h4>
+            <p className="text-[11px] text-app-secondary">
+              Belirttiğiniz başlangıç ve bitiş tarihleri arasındaki tüm görevler, seanslar, notlar ve günlükler veritabanından kalıcı olarak temizlenir.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-semibold text-app-secondary mb-1">
+                  Başlangıç Tarihi
+                </label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-full px-3 py-1.5 rounded-xl border border-app bg-app-primary text-app-primary text-xs focus:outline-none focus:ring-1 focus:ring-rose-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-app-secondary mb-1">
+                  Bitiş Tarihi
+                </label>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-full px-3 py-1.5 rounded-xl border border-app bg-app-primary text-app-primary text-xs focus:outline-none focus:ring-1 focus:ring-rose-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-1">
+              <button
+                type="submit"
+                className="px-4 py-2 rounded-xl bg-rose-500 text-white font-semibold text-xs hover:bg-rose-600 transition-all flex items-center gap-1.5 shadow-xs"
+              >
+                <Trash2 className="w-3.5 h-3.5" /> Seçili Tarih Aralığındaki Verileri Sil
+              </button>
+            </div>
+          </form>
+
+          {/* Tüm Verileri Sıfırla (Hard Reset) */}
+          <div className="pt-4 border-t border-app space-y-3">
+            <h4 className="text-xs font-bold text-rose-500 flex items-center gap-1.5">
+              <AlertTriangle className="w-4 h-4 text-rose-500" /> Tüm Uygulama Verilerini Sıfırla (Fabrika Ayarları)
+            </h4>
+            <p className="text-[11px] text-app-secondary">
+              Uygulamanızdaki tüm görevler, alt görevler, seanslar, notlar, alışkanlıklar, günlükler ve ekler silinir. Sadece varsayılan uygulama ayarlarınız korunur.
+            </p>
+
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsFullResetModalOpen(true)}
+                className="px-4 py-2 rounded-xl border border-rose-500 text-rose-500 font-bold text-xs hover:bg-rose-500 hover:text-white transition-all flex items-center gap-1.5"
+              >
+                <RefreshCw className="w-3.5 h-3.5" /> Tüm Verileri Kalıcı Olarak Sıfırla
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
+
+      {/* Full Reset Confirmation Modal */}
+      {isFullResetModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-app-surface border border-rose-500/40 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center gap-3 text-rose-500">
+              <AlertTriangle className="w-6 h-6 shrink-0" />
+              <h3 className="font-bold text-base text-app-primary">Tüm Verileri Sıfırlamak İstiyor Musunuz?</h3>
+            </div>
+
+            <p className="text-xs text-app-secondary leading-relaxed">
+              Bu işlem <strong>GERİ ALINAMAZ</strong>. Tüm görevleriniz, notlarınız, alışkanlıklarınız, günlükleriniz ve seans verileriniz tamamen silinecektir.
+            </p>
+
+            <div>
+              <label className="block text-xs font-semibold text-app-primary mb-1">
+                Devam etmek için <strong>"TEMİZLE"</strong> yazın:
+              </label>
+              <input
+                type="text"
+                autoFocus
+                value={confirmInputText}
+                onChange={(e) => setConfirmInputText(e.target.value)}
+                placeholder="TEMİZLE"
+                className="w-full px-3 py-2 rounded-xl border border-rose-500/40 bg-app-primary text-app-primary text-xs font-bold tracking-wider focus:outline-none focus:ring-1 focus:ring-rose-500"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-app">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsFullResetModalOpen(false);
+                  setConfirmInputText('');
+                }}
+                className="px-4 py-2 rounded-xl border border-app text-app-secondary text-xs hover:bg-app-surface-hover"
+              >
+                İptal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmFullReset}
+                disabled={confirmInputText.trim().toUpperCase() !== 'TEMİZLE'}
+                className="px-4 py-2 rounded-xl bg-rose-500 text-white font-bold text-xs hover:bg-rose-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              >
+                Sıfırlamayı Onayla
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

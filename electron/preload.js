@@ -71,10 +71,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getSettings: () => ipcRenderer.invoke('settings:get'),
   updateSettings: (settings) => ipcRenderer.invoke('settings:update', settings),
 
-  // Export / Import
+  // Export / Import & Cleanup
   exportDatabase: () => ipcRenderer.invoke('db:export'),
   importDatabase: () => ipcRenderer.invoke('db:import'),
   exportCSV: (data, filename) => ipcRenderer.invoke('db:exportCSV', data, filename),
+  clearDataByDateRange: (startDate, endDate) => ipcRenderer.invoke('db:clearByDate', startDate, endDate),
+  clearAllData: () => ipcRenderer.invoke('db:clearAll'),
 
   // Summary & Notifications
   getYesterdaySummary: () => ipcRenderer.invoke('summary:yesterday'),

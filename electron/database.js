@@ -1069,3 +1069,39 @@ export function getYesterdaySummary() {
     completedTasksCount: compObj.count || 0,
   };
 }
+
+export function clearDataByDateRange(startDate, endDate) {
+  if (!startDate || !endDate) return { success: false, error: 'Tarih aralığı eksik' };
+
+  const startIso = `${startDate}T00:00:00.000Z`;
+  const endIso = `${endDate}T23:59:59.999Z`;
+
+  db.run(`DELETE FROM tasks WHERE (created_at >= ? AND created_at <= ?) OR (planned_date >= ? AND planned_date <= ?)`, [startIso, endIso, startDate, endDate]);
+  db.run(`DELETE FROM task_sessions WHERE start_time >= ? AND start_time <= ?`, [startIso, endIso]);
+  db.run(`DELETE FROM notes WHERE created_at >= ? AND created_at <= ?`, [startIso, endIso]);
+  db.run(`DELETE FROM habit_completions WHERE date >= ? AND date <= ?`, [startDate, endDate]);
+  db.run(`DELETE FROM course_sessions WHERE start_time >= ? AND start_time <= ?`, [startIso, endIso]);
+  db.run(`DELETE FROM journal_entries WHERE entry_date >= ? AND entry_date <= ?`, [startDate, endDate]);
+
+  rebuildSearchIndex();
+  saveDb();
+  return { success: true };
+}
+
+export function clearAllData() {
+  db.run("DELETE FROM tasks");
+  db.run("DELETE FROM subtasks");
+  db.run("DELETE FROM task_sessions");
+  db.run("DELETE FROM notes");
+  db.run("DELETE FROM habits");
+  db.run("DELETE FROM habit_completions");
+  db.run("DELETE FROM courses");
+  db.run("DELETE FROM course_sessions");
+  db.run("DELETE FROM task_attachments");
+  db.run("DELETE FROM journal_entries");
+  db.run("DELETE FROM task_links");
+  db.run("DELETE FROM search_index");
+
+  saveDb();
+  return { success: true };
+}

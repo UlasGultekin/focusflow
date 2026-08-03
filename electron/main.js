@@ -50,6 +50,8 @@ import {
   updateSettings,
   exportDatabase,
   importDatabase,
+  clearDataByDateRange,
+  clearAllData,
   getYesterdaySummary
 } from './database.js';
 
@@ -359,6 +361,10 @@ function setupIPCHandlers() {
     }
     return { success: false };
   });
+
+  // DB Data Cleanup
+  ipcMain.handle('db:clearByDate', (_, startDate, endDate) => clearDataByDateRange(startDate, endDate));
+  ipcMain.handle('db:clearAll', () => clearAllData());
 
   // Summary & Notification
   ipcMain.handle('summary:yesterday', () => getYesterdaySummary());
