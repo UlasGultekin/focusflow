@@ -2,12 +2,13 @@
   "name": "focusflow",
   "version": "1.0.0",
   "description": "Şık, verileri kalıcı masaüstü odaklanma ve görev yönetim uygulaması",
+  "author": "Ulas Gultekin",
   "main": "electron/main.js",
   "type": "module",
   "scripts": {
     "dev": "concurrently -k \"vite\" \"wait-on tcp:5173 && electron .\"",
     "build:vite": "vite build",
-    "build": "vite build && electron-builder",
+    "build": "vite build && electron-builder --win dir",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -43,7 +44,7 @@
       "electron/**/*"
     ],
     "win": {
-      "target": "nsis"
+      "target": "dir"
     }
   }
 }
