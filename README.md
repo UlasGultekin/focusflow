@@ -77,6 +77,63 @@ Uygulamayı yerel bilgisayarınızda çalıştırmak için aşağıdaki adımlar
   node -v
   ```
 
+> **⚠️ Bilgisayarınızda farklı bir Node.js sürümü kuruluysa (örn. v14)?**
+> Endişelenmeyin — mevcut Node sürümünüze dokunmadan **nvm-windows** ile birden fazla Node versiyonunu yan yana kullanabilirsiniz. Detaylar için aşağıdaki "nvm-windows Kullanımı" bölümüne bakın.
+
+---
+
+### 🔄 Farklı Node.js Sürümü Kullananlar İçin: nvm-windows
+
+Bilgisayarınızda başka bir projeniz için Node.js v14 (veya başka bir sürüm) kurulu ise, mevcut kurulumunuza **dokunmadan** Node 20'yi yükleyip sadece bu proje için kullanabilirsiniz.
+
+#### Adım 1 — nvm-windows'u Yükleyin
+
+1. [https://github.com/coreybutler/nvm-windows/releases](https://github.com/coreybutler/nvm-windows/releases) adresine gidin.
+2. En son `nvm-setup.exe` dosyasını indirin ve yükleyin.
+3. Yükleme tamamlandıktan sonra terminali (PowerShell veya CMD) kapatıp yeniden açın.
+
+#### Adım 2 — Node.js v20'yi nvm ile Yükleyin
+
+Mevcut Node sürümünüze dokunulmadan Node 20 yüklenir:
+
+```powershell
+nvm install 20
+nvm list          # Yüklü tüm versiyonları listeler
+```
+
+Çıktı şuna benzeyecektir:
+```
+  * 14.21.3 (currently active)
+    20.19.0
+```
+
+#### Adım 3 — FocusFlow'u Çalıştırmadan Önce Node 20'ye Geçin
+
+```powershell
+nvm use 20
+node -v           # v20.x.x çıktısı görmelisiniz
+```
+
+#### Adım 4 — Projeyi Normal Şekilde Çalıştırın
+
+```powershell
+npm install
+npm run dev       # Geliştirici modu
+# veya
+npm run build     # .exe paketi oluştur
+```
+
+#### Adım 5 — İşiniz Bitince Eski Sürüme Dönün
+
+```powershell
+nvm use 14
+node -v           # v14.x.x — eski projeniz etkilenmez ✅
+```
+
+> **📌 Not:** nvm, her Node sürümü için tamamen bağımsız bir `node_modules` ortamı tutar. İki proje birbirini hiçbir şekilde etkilemez.
+
+---
+
 ### 2. Repoyu Klonlayın
 ```bash
 git clone https://github.com/UlasGultekin/focusflow.git
