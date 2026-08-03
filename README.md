@@ -1,0 +1,108 @@
+# FocusFlow 🚀
+> **Masaüstü Odaklanma, Görev, Takvim ve Alışkanlık Yönetim Uygulaması**
+
+FocusFlow; Electron, React 19, Vite, Tailwind CSS ve sql.js (WebAssembly SQLite) teknolojileri ile geliştirilmiş modern, şık ve tam teşekküllü bir masaüstü kişisel üretkenlik komuta merkezidir.
+
+---
+
+## 🌟 Öne Çıkan Özellikler
+
+### 1. 📋 Görev Yönetimi & Pomodoro Odaklanma
+- Manuel süre başlatma veya dairesel geri sayım animasyonlu **Pomodoro Sayacı** (Odak, Kısa Mola, Uzun Mola modları).
+- Öncelik, kategori, zaman tahmini, harcanan süre takibi ve renk kodlaması.
+
+### 2. 📊 Kanban Görev Panosu (Board)
+- **Yapılacak (Todo)** → **Devam Eden (In Progress)** → **Tamamlanan (Done)** sütunları.
+- Toplam görev sayısı ve dinamik tamamlanma yüzdesi göstergesi.
+- Bir göreve başlandığında otomatik olarak *In Progress* sütununa taşınma entegrasyonu.
+
+### 3. 📅 Dahili Takvim & Günlük Zaman Planlayıcı
+- Herhangi bir dış servise ihtiyaç duymadan çalışan **07:00 – 23:00** saatlik zaman çizelgesi.
+- Belirli saat dilimlerine etkinlik veya görev atama.
+- Çakışan planlarda otomatik **Zaman Çakışması Uyarısı**.
+
+### 4. 🎓 Eğitimler & Kurslar (Learning Hub)
+- Udemy, YouTube veya ders linklerini ekleme.
+- **"Tarayıcıda Aç"** butonu ile bağlantıları tek tıkla bilgisayarınızın varsayılan web tarayıcısında açma.
+- **Canlı Geçen Süre Sayacı (`MM:SS`)**: Eğitime çalışırken anlık sürenizi izleme.
+- Ders bittiğinde harcanan zamanın otomatik olarak **Tamamlanmış Görev (Done)** olarak kaydedilmesi.
+
+### 5. 🔥 Alışkanlık Takibi & Zinciri Kırma (Streak)
+- Günlük tekrar eden eylemler (su iç, kitap oku, egzersiz yap vb.).
+- **Ardışık Günlük Seri (Streak)** hesabı ve alev simgesi.
+- **30 Günlük Isı Haritası Grid'i**: Son 30 gündeki tamamlama geçmişinin görsel takibi.
+
+### 6. 📖 Günlük Düşünce & Akış Notları (Journal)
+- Takvim tabanlı serbest metin alanı.
+- **5'li Ruh Hali Seçici (Mood Tracker)**: 😞 😐 🙂 😊 🤩 emojileri ile duygusal durum kaydı.
+- 1.5 saniye sonra otomatik veritabanına kayıt (**Debounce Auto-Save**).
+
+### 7. 📁 Dosya ve Klasör Ekleri (Attachments)
+- Görevlere bilgisayarınızdan dosya veya klasör yolları bağlama.
+- **"Aç"** butonu ile dosyayı/klasörü işletim sisteminin varsayılan uygulamasında açma (`shell.openPath`).
+
+### 8. 🔒 Görev Ön Koşulları & Kilit Sistemi (Dependencies)
+- Görevler arası engelleme ilişkileri tanımlama (Blocks / Relates To).
+- Ön koşul görev tamamlanmadan hedef görevin *"Şimdi Göreve Başla"* butonunun kilitlenmesi ve Board kartında kilit ikonu (`🔒`) gösterimi.
+
+### 9. 📋 Görev İçinde Alt Görevler (Checklist / Subtasks)
+- Ana görevleri küçük adımlara bölme.
+- Yeşil canlı ilerleme çubuğu ve tamamlama oranı (`2 / 5 tamamlandı %40`).
+- Adımlar bittiğinde ana görevi otomatik tamamlama seçeneği.
+
+### 🎨 Tema & Sistem Tepsisi (Tray)
+- **Soft Light**, **Deep Dark** ve **Pastel Calm** renk temaları.
+- Sistem tepsisinde (Tray) arka planda çalışma ve `Ctrl+Shift+Space` küresel kısayol tuşu.
+
+---
+
+## 💻 Kurulum ve Çalıştırma Adımları
+
+Uygulamayı yerel bilgisayarınızda çalıştırmak için aşağıdaki adımları sırasıyla takip edin:
+
+### 1. Ön Gereksinimler
+- Bilgisayarınızda **Node.js** (v18 veya daha yeni sürüm) kurulu olmalıdır. Node sürümünüzü kontrol etmek için:
+  ```bash
+  node -v
+  ```
+
+### 2. Repoyu Klonlayın
+```bash
+git clone https://github.com/UlasGultekin/focusflow.git
+cd focusflow
+```
+
+### 3. Bağımlılıkları Yükleyin
+```bash
+npm install
+```
+
+### 4. Geliştirici Modunda Çalıştırın (Development)
+Uygulamayı canlı sıcak yeniden yükleme (HMR) ile başlatmak için:
+```bash
+npm run dev
+```
+*Bu komut Vite geliştirici sunucusunu başlatır ve ardından Electron masaüstü penceresini otomatik olarak açar.*
+
+### 5. Production Masaüstü Paketi Derleme (Build)
+Uygulamanın çalıştırılabilir `.exe` (Windows) paketini derlemek için:
+```bash
+npm run build
+```
+
+---
+
+## 🛠️ Proje Mimarısı & Teknoloji Yığını
+
+- **Masaüstü Çatısı**: [Electron](https://www.electronjs.org/)
+- **Kullanıcı Arayüzü**: [React 19](https://react.dev/), [Vite](https://vitejs.dev/)
+- **Stil & Tasarım**: [Tailwind CSS v4](https://tailwindcss.com/), [Lucide React Icons](https://lucide.dev/)
+- **Veritabanı Motoru**: `sql.js` (WebAssembly SQLite - C++ derleme bağımlılığı olmadan yerel `.db` dosyasında veri saklar)
+- **Durum Yönetimi (State)**: [Zustand](https://github.com/pmndrs/zustand)
+- **Grafikler & Analiz**: [Recharts](https://recharts.org/)
+
+---
+
+## 📝 Lisans
+
+Bu proje **MIT Lisansı** ile lisanslanmıştır. Dilediğiniz gibi geliştirebilir ve özelleştirebilirsiniz.
