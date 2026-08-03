@@ -18,8 +18,6 @@ import {
 import { useSettingsStore } from '../stores/useSettingsStore';
 import { useTaskStore } from '../stores/useTaskStore';
 import { useHabitStore } from '../stores/useHabitStore';
-import { useJournalStore } from '../stores/useJournalStore';
-import { useCourseStore } from '../stores/useCourseStore';
 import { useSearchStore } from '../stores/useSearchStore';
 
 export default function SettingsView() {
@@ -55,11 +53,17 @@ export default function SettingsView() {
   const [confirmInputText, setConfirmInputText] = useState('');
 
   const refreshAllStores = async () => {
-    await fetchTasks('all');
-    if (useHabitStore.getState().fetchHabits) await useHabitStore.getState().fetchHabits();
-    if (useJournalStore.getState().fetchAllEntries) await useJournalStore.getState().fetchAllEntries();
-    if (useCourseStore.getState().fetchCourses) await useCourseStore.getState().fetchCourses();
-    if (useSearchStore.getState().rebuildIndex) await useSearchStore.getState().rebuildIndex();
+    // Re-fetch tasks first
+    await fetchTasks();
+    // Re-fetch habits
+    const habitState = useHabitStore.getState();
+    if (habitState?.fetchHabits) await habitState.fetchHabits();
+    // Re-fetch search index
+    const searchState = useSearchStore.getState();
+    if (searchState?.rebuildIndex) await searchState.rebuildIndex();
+    // Re-fetch settings (most important - ensures pomodoro values re-populate)
+    const { fetchSettings } = useSettingsStore.getState();
+    if (fetchSettings) await fetchSettings();
   };
 
   const handleSavePomodoro = async (e) => {
@@ -127,11 +131,8 @@ export default function SettingsView() {
     ) {
       if (window.electronAPI && window.electronAPI.clearDataByDateRange) {
         await window.electronAPI.clearDataByDateRange(startDate, endDate);
-        await refreshAllStores();
-        setIsDateCleanupSuccess(true);
-        setTimeout(() => setIsDateCleanupSuccess(false), 3000);
-        setStartDate('');
-        setEndDate('');
+        // Full page reload to cleanly re-initialize all Zustand stores from empty DB
+        window.location.reload();
       }
     }
   };
@@ -145,10 +146,9 @@ export default function SettingsView() {
 
     if (window.electronAPI && window.electronAPI.clearAllData) {
       await window.electronAPI.clearAllData();
-      await refreshAllStores();
-      setIsFullResetModalOpen(false);
-      setConfirmInputText('');
-      alert('Tüm veriler başarıyla temizlendi ve uygulama sıfırlandı.');
+      // Full page reload — the only reliable way to re-initialize all Zustand stores
+      // from a completely empty database without stale in-memory state.
+      window.location.reload();
     }
   };
 

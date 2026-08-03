@@ -1089,6 +1089,7 @@ export function clearDataByDateRange(startDate, endDate) {
 }
 
 export function clearAllData() {
+  // Only delete user-generated data — NOT settings/pomodoro tables
   db.run("DELETE FROM tasks");
   db.run("DELETE FROM subtasks");
   db.run("DELETE FROM task_sessions");
@@ -1101,6 +1102,20 @@ export function clearAllData() {
   db.run("DELETE FROM journal_entries");
   db.run("DELETE FROM task_links");
   db.run("DELETE FROM search_index");
+
+  // Reset SQLite auto-increment sequences so new IDs start from 1
+  db.run("DELETE FROM sqlite_sequence WHERE name IN ('tasks','subtasks','task_sessions','notes','habits','habit_completions','courses','course_sessions','task_attachments','journal_entries','task_links','search_index')");
+
+  // Ensure settings rows still exist (re-insert if somehow missing)
+  const pomodoroCheck = db.exec("SELECT COUNT(*) as c FROM pomodoro_settings");
+  if (!pomodoroCheck.length || pomodoroCheck[0].values[0][0] === 0) {
+    db.run("INSERT INTO pomodoro_settings (id, focus_duration, short_break, long_break, long_break_interval) VALUES (1, 25, 5, 15, 4)");
+  }
+
+  const settingsCheck = db.exec("SELECT COUNT(*) as c FROM settings");
+  if (!settingsCheck.length || settingsCheck[0].values[0][0] === 0) {
+    db.run("INSERT INTO settings (id, theme, compact_mode, hotkeys, backup_path) VALUES (1, 'light', 0, 'Ctrl+Shift+Space', '')");
+  }
 
   saveDb();
   return { success: true };
