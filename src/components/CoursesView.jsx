@@ -108,22 +108,30 @@ export default function CoursesView() {
         </button>
       </div>
 
-      {/* Category Filter Tabs */}
+      {/* Category Filter Dropdown */}
       {categories.length > 1 && (
-        <div className="px-6 py-3 border-b border-app bg-app-primary flex items-center gap-2 overflow-x-auto">
-          {categories.map((cat) => (
+        <div className="px-6 py-3 border-b border-app bg-app-primary flex items-center gap-3">
+          <span className="text-xs font-semibold text-app-secondary shrink-0">Kategori:</span>
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="px-3 py-1.5 rounded-xl border border-app bg-app-surface text-app-primary text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-app-accent cursor-pointer min-w-[160px]"
+          >
+            <option value="all">🗂 Tümü ({courses.length} kurs)</option>
+            {categories.filter((c) => c !== 'all').map((cat) => (
+              <option key={cat} value={cat}>
+                {cat} ({courses.filter((c) => c.category === cat).length} kurs)
+              </option>
+            ))}
+          </select>
+          {categoryFilter !== 'all' && (
             <button
-              key={cat}
-              onClick={() => setCategoryFilter(cat)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
-                categoryFilter === cat
-                  ? 'bg-app-accent text-white shadow-xs'
-                  : 'bg-app-secondary text-app-secondary hover:text-app-primary hover:bg-app-surface'
-              }`}
+              onClick={() => setCategoryFilter('all')}
+              className="text-xs text-app-muted hover:text-app-accent transition-colors"
             >
-              {cat === 'all' ? 'Tümü' : cat}
+              × Temizle
             </button>
-          ))}
+          )}
         </div>
       )}
 
