@@ -1,6 +1,12 @@
 import { create } from 'zustand';
 import { useTaskStore } from './useTaskStore';
 import { useSettingsStore } from './useSettingsStore';
+import {
+  playFocusCompleteSound,
+  playBreakCompleteSound,
+  playTimerStartSound,
+  playTimerPauseSound,
+} from '../utils/sounds';
 
 let timerInterval = null;
 
@@ -45,6 +51,7 @@ export const useTimerStore = create((set, get) => ({
     }
 
     set({ status: 'running' });
+    playTimerStartSound();
 
     clearInterval(timerInterval);
     timerInterval = setInterval(() => {
@@ -54,6 +61,7 @@ export const useTimerStore = create((set, get) => ({
 
   pauseTimer: () => {
     clearInterval(timerInterval);
+    if (get().status === 'running') playTimerPauseSound();
     set({ status: 'paused' });
   },
 
@@ -117,6 +125,13 @@ export const useTimerStore = create((set, get) => ({
         useTaskStore.getState().fetchTaskSessions(selectedTaskId);
         useTaskStore.getState().fetchTasks();
       }
+    }
+
+    // Play completion sound
+    if (mode === 'focus') {
+      playFocusCompleteSound();
+    } else {
+      playBreakCompleteSound();
     }
 
     // Send Notification

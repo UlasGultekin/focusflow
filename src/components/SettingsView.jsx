@@ -14,11 +14,20 @@ import {
   AlertTriangle,
   Calendar,
   RefreshCw,
+  Volume2,
+  VolumeX,
+  Play,
 } from 'lucide-react';
 import { useSettingsStore } from '../stores/useSettingsStore';
 import { useTaskStore } from '../stores/useTaskStore';
 import { useHabitStore } from '../stores/useHabitStore';
 import { useSearchStore } from '../stores/useSearchStore';
+import {
+  playFocusCompleteSound,
+  playBreakCompleteSound,
+  playEventReminderSound,
+  playTimerStartSound,
+} from '../utils/sounds';
 
 export default function SettingsView() {
   const {
@@ -39,6 +48,30 @@ export default function SettingsView() {
   const [longBreak, setLongBreak] = useState(pomodoro.long_break || 15);
   const [longBreakInterval, setLongBreakInterval] = useState(pomodoro.long_break_interval || 4);
   const [hotkeyVal, setHotkeyVal] = useState(hotkeys || 'Ctrl+Shift+Space');
+
+  // Sound settings
+  const [soundEnabled, setSoundEnabled] = useState(() => {
+    const stored = localStorage.getItem('ff_sound_enabled');
+    return stored === null ? true : stored === 'true';
+  });
+  const [soundVolume, setSoundVolume] = useState(() => {
+    const stored = localStorage.getItem('ff_sound_volume');
+    return stored === null ? 0.4 : parseFloat(stored);
+  });
+
+  const handleToggleSound = (val) => {
+    setSoundEnabled(val);
+    localStorage.setItem('ff_sound_enabled', String(val));
+    // Update sounds utility global flag
+    window.__ff_sound_enabled = val;
+    window.__ff_sound_volume = soundVolume;
+  };
+
+  const handleVolumeChange = (val) => {
+    setSoundVolume(val);
+    localStorage.setItem('ff_sound_volume', String(val));
+    window.__ff_sound_volume = val;
+  };
 
   const [isSavedPomodoro, setIsSavedPomodoro] = useState(false);
   const [isSavedHotkey, setIsSavedHotkey] = useState(false);
@@ -300,7 +333,99 @@ export default function SettingsView() {
           </div>
         </form>
 
-        {/* 3. Global Kısayol Tuşu */}
+        {/* 3. Ses Ayarları */}
+        <div className="bg-app-surface border border-app rounded-2xl p-5 shadow-xs space-y-4">
+          <h3 className="text-sm font-bold text-app-primary flex items-center gap-2">
+            {soundEnabled ? (
+              <Volume2 className="w-4 h-4 text-app-accent" />
+            ) : (
+              <VolumeX className="w-4 h-4 text-app-muted" />
+            )}
+            Ses Bildirimleri
+          </h3>
+          <p className="text-xs text-app-secondary">
+            Timer dolduğunda ve etkinlik hatırlatıcılarında ses efektleri çalar.
+          </p>
+
+          {/* Ses Aç/Kapat toggle */}
+          <div className="flex items-center justify-between p-3 rounded-xl bg-app-primary border border-app">
+            <div>
+              <span className="text-xs font-semibold text-app-primary block">Ses Efektleri</span>
+              <span className="text-[11px] text-app-muted">Timer ve bildirim seslerini etkinleştirir.</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleToggleSound(!soundEnabled)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                soundEnabled ? 'bg-app-accent' : 'bg-app-secondary'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                  soundEnabled ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* Ses Seviyesi */}
+          {soundEnabled && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-semibold text-app-secondary">Ses Seviyesi</label>
+                <span className="text-[11px] font-bold text-app-accent">{Math.round(soundVolume * 100)}%</span>
+              </div>
+              <input
+                type="range"
+                min="0.05"
+                max="1"
+                step="0.05"
+                value={soundVolume}
+                onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
+                className="w-full h-1.5 rounded-full accent-app-accent cursor-pointer"
+              />
+            </div>
+          )}
+
+          {/* Test Butonları */}
+          {soundEnabled && (
+            <div className="pt-1 space-y-2">
+              <p className="text-[11px] font-semibold text-app-secondary">Önizleme:</p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => playTimerStartSound(soundVolume)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-app text-app-secondary text-xs hover:bg-app-surface-hover transition-all"
+                >
+                  <Play className="w-3 h-3" /> Timer Başlat
+                </button>
+                <button
+                  type="button"
+                  onClick={() => playFocusCompleteSound(soundVolume)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-app text-app-secondary text-xs hover:bg-app-surface-hover transition-all"
+                >
+                  <Play className="w-3 h-3" /> Odak Tamamlandı
+                </button>
+                <button
+                  type="button"
+                  onClick={() => playBreakCompleteSound(soundVolume)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-app text-app-secondary text-xs hover:bg-app-surface-hover transition-all"
+                >
+                  <Play className="w-3 h-3" /> Mola Tamamlandı
+                </button>
+                <button
+                  type="button"
+                  onClick={() => playEventReminderSound(soundVolume)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-app text-app-secondary text-xs hover:bg-app-surface-hover transition-all"
+                >
+                  <Play className="w-3 h-3" /> Etkinlik Hatırlatıcı
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 4. Global Kısayol Tuşu */}
         <form onSubmit={handleSaveHotkey} className="bg-app-surface border border-app rounded-2xl p-5 shadow-xs space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold text-app-primary flex items-center gap-2">
