@@ -74,9 +74,9 @@ export default function TaskList({ onOpenAddModal }) {
         {/* Status Filter Tabs */}
         <div className="flex items-center gap-1 bg-app-secondary p-1 rounded-xl">
           {[
-            { id: 'all', label: 'Tümü' },
             { id: 'active', label: 'Aktif' },
             { id: 'completed', label: 'Tamamlanan' },
+            { id: 'all', label: 'Tümü' },
           ].map((tab) => (
             <button
               key={tab.id}

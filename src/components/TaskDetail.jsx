@@ -56,6 +56,8 @@ export default function TaskDetail({ onEditTask, onShareTask }) {
   const [targetTaskId, setTargetTaskId] = useState('');
   const [linkType, setLinkType] = useState('blocks');
 
+  const [manualMinutes, setManualMinutes] = useState('');
+
   const task = tasks.find((t) => t.id === selectedTaskId);
   const subtasks = task ? subtasksMap[task.id] || [] : [];
 
@@ -210,6 +212,15 @@ export default function TaskDetail({ onEditTask, onShareTask }) {
       loadBlockedStatus();
     }
   };
+  const handleManualDeductTime = async (e) => {
+    e.preventDefault();
+    const mins = parseInt(manualMinutes, 10);
+    if (!mins || mins <= 0) return;
+    const current = task.estimated_minutes || 0;
+    const newMins = Math.max(0, current - mins);
+    await updateTask(task.id, { estimated_minutes: newMins });
+    setManualMinutes('');
+  };
 
   return (
     <div className="flex-1 h-full flex flex-col bg-app-primary overflow-y-auto p-6 space-y-6">
@@ -305,6 +316,33 @@ export default function TaskDetail({ onEditTask, onShareTask }) {
           )}
         </button>
       </div>
+
+      {/* Manuel Süre Düşme */}
+      <form
+        onSubmit={handleManualDeductTime}
+        className="flex items-center gap-2 p-3 rounded-xl bg-app-surface border border-app"
+      >
+        <Clock className="w-4 h-4 text-app-accent shrink-0" />
+        <span className="text-xs text-app-secondary font-semibold shrink-0">Manuel Süre Düş:</span>
+        <input
+          type="number"
+          min="1"
+          value={manualMinutes}
+          onChange={(e) => setManualMinutes(e.target.value)}
+          placeholder="Dakika"
+          className="w-20 px-2 py-1 rounded-lg border border-app bg-app-primary text-app-primary text-xs focus:outline-none focus:ring-1 focus:ring-app-accent"
+        />
+        <span className="text-xs text-app-muted">dk</span>
+        <button
+          type="submit"
+          className="ml-auto px-3 py-1.5 rounded-lg bg-app-accent text-white font-semibold text-xs hover:opacity-90 transition-all"
+        >
+          Düş
+        </button>
+        <span className="text-[11px] text-app-muted">
+          Kalan: <strong className="text-app-primary">{task.estimated_minutes || 0} dk</strong>
+        </span>
+      </form>
 
       {/* SUBTASKS SECTION (Görev 18) */}
       <div className="p-5 rounded-2xl bg-app-surface border border-app space-y-4 shadow-xs">

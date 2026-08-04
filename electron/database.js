@@ -226,7 +226,7 @@ export async function initDatabase() {
 
   // Seed tasks if empty
   const taskRes = db.exec('SELECT COUNT(*) as count FROM tasks');
-  if (!taskRes.length || taskRes[0].values[0][0] < 3) {
+  if (!taskRes.length || taskRes[0].values[0][0] === 0) {
     const now = new Date();
     const nowIso = now.toISOString();
     const todayStr = nowIso.slice(0, 10);

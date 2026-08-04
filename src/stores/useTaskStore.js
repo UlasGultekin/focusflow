@@ -2,10 +2,11 @@ import { create } from 'zustand';
 
 export const useTaskStore = create((set, get) => ({
   tasks: [],
+  allNotes: [],
   selectedTaskId: null,
   activeSession: null,
   isLoading: false,
-  filterStatus: 'all',
+  filterStatus: 'active',
   filterCategory: 'all',
   searchQuery: '',
   subtasksMap: {}, // taskId -> subtasks array
@@ -141,6 +142,37 @@ export const useTaskStore = create((set, get) => ({
       await window.electronAPI.endSession(activeSession.id);
       set({ activeSession: null });
       await get().fetchTasks();
+    }
+  },
+
+  // GENEL NOTLAR
+  fetchAllNotes: async () => {
+    if (window.electronAPI) {
+      const notes = await window.electronAPI.getNotes(null);
+      set({ allNotes: notes || [] });
+    }
+  },
+
+  addNote: async (content, taskId) => {
+    if (window.electronAPI) {
+      const newNote = await window.electronAPI.addNote(content, taskId || null);
+      await get().fetchAllNotes();
+      return newNote;
+    }
+  },
+
+  updateNote: async (id, content, taskId) => {
+    if (window.electronAPI) {
+      const updated = await window.electronAPI.updateNote(id, content);
+      await get().fetchAllNotes();
+      return updated;
+    }
+  },
+
+  deleteNote: async (id, taskId) => {
+    if (window.electronAPI) {
+      await window.electronAPI.deleteNote(id);
+      await get().fetchAllNotes();
     }
   },
 }));
