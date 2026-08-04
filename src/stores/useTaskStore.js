@@ -153,17 +153,17 @@ export const useTaskStore = create((set, get) => ({
     }
   },
 
-  addNote: async (content, taskId) => {
+  addNote: async (content, taskId, category) => {
     if (window.electronAPI) {
-      const newNote = await window.electronAPI.addNote(content, taskId || null);
+      const newNote = await window.electronAPI.addNote(content, taskId || null, category || 'Genel');
       await get().fetchAllNotes();
       return newNote;
     }
   },
 
-  updateNote: async (id, content, taskId) => {
+  updateNote: async (id, content, taskId, category) => {
     if (window.electronAPI) {
-      const updated = await window.electronAPI.updateNote(id, content);
+      const updated = await window.electronAPI.updateNote(id, content, category);
       await get().fetchAllNotes();
       return updated;
     }

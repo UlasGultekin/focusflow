@@ -74,6 +74,7 @@ export async function initDatabase() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       task_id INTEGER,
       content TEXT NOT NULL,
+      category TEXT DEFAULT 'Genel',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -203,6 +204,15 @@ export async function initDatabase() {
 
     db.run("UPDATE tasks SET status = 'todo' WHERE status = 'active'");
     db.run("UPDATE tasks SET status = 'done' WHERE status = 'completed'");
+
+    // notes tablosuna category sütunu ekle
+    const notesInfo = db.exec("PRAGMA table_info(notes)");
+    if (notesInfo.length > 0) {
+      const notesCols = notesInfo[0].values.map((col) => col[1]);
+      if (!notesCols.includes('category')) {
+        db.run("ALTER TABLE notes ADD COLUMN category TEXT DEFAULT 'Genel'");
+      }
+    }
   } catch (err) {
     console.error('Migrasyon hatası:', err);
   }
@@ -710,11 +720,11 @@ export function getNotes(taskId = null) {
   return resultToObjects(res);
 }
 
-export function addNote(content, taskId = null) {
+export function addNote(content, taskId = null, category = 'Genel') {
   const now = new Date().toISOString();
   db.run(
-    `INSERT INTO notes (task_id, content, created_at, updated_at) VALUES (?, ?, ?, ?)`,
-    [taskId, content, now, now]
+    `INSERT INTO notes (task_id, content, category, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
+    [taskId, content, category || 'Genel', now, now]
   );
   saveDb();
   const newNote = getLastInserted('notes');
@@ -725,12 +735,19 @@ export function addNote(content, taskId = null) {
   return newNote;
 }
 
-export function updateNote(id, content, taskId = null) {
+export function updateNote(id, content, taskId = null, category = null) {
   const now = new Date().toISOString();
-  db.run(
-    `UPDATE notes SET content = ?, updated_at = ? WHERE id = ${id}`,
-    [content, now]
-  );
+  if (category !== null) {
+    db.run(
+      `UPDATE notes SET content = ?, category = ?, updated_at = ? WHERE id = ${id}`,
+      [content, category, now]
+    );
+  } else {
+    db.run(
+      `UPDATE notes SET content = ?, updated_at = ? WHERE id = ${id}`,
+      [content, now]
+    );
+  }
   saveDb();
   const updatedRes = db.exec(`SELECT * FROM notes WHERE id = ${id}`);
   const updated = resultToObjects(updatedRes)[0];

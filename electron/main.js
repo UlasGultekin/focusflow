@@ -230,8 +230,8 @@ function setupIPCHandlers() {
 
   // Notes
   ipcMain.handle('notes:get', (_, taskId) => getNotes(taskId));
-  ipcMain.handle('notes:add', (_, content, taskId) => addNote(content, taskId));
-  ipcMain.handle('notes:update', (_, id, content) => updateNote(id, content));
+  ipcMain.handle('notes:add', (_, content, taskId, category) => addNote(content, taskId, category));
+  ipcMain.handle('notes:update', (_, id, content, category) => updateNote(id, content, null, category));
   ipcMain.handle('notes:delete', (_, id) => deleteNote(id));
 
   // Habits

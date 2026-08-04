@@ -29,8 +29,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Notes
   getNotes: (taskId) => ipcRenderer.invoke('notes:get', taskId),
-  addNote: (content, taskId) => ipcRenderer.invoke('notes:add', content, taskId),
-  updateNote: (id, content) => ipcRenderer.invoke('notes:update', id, content),
+  addNote: (content, taskId, category) => ipcRenderer.invoke('notes:add', content, taskId, category),
+  updateNote: (id, content, category) => ipcRenderer.invoke('notes:update', id, content, category),
   deleteNote: (id) => ipcRenderer.invoke('notes:delete', id),
 
   // Habits
