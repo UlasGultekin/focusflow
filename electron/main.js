@@ -52,7 +52,8 @@ import {
   importDatabase,
   clearDataByDateRange,
   clearAllData,
-  getYesterdaySummary
+  getYesterdaySummary,
+  getTodayPlannedEvents
 } from './database.js';
 
 const { app, BrowserWindow, ipcMain, Tray, Menu, globalShortcut, Notification, dialog, nativeImage, shell } = electron;
@@ -68,6 +69,9 @@ const __dirname = path.dirname(__filename);
 let mainWindow = null;
 let tray = null;
 let isQuitting = false;
+let notificationTimer = null;
+// Track which events have already been notified (eventId -> notified minute string)
+const notifiedEvents = new Map();
 
 function createWindow() {
   const appIconPath = path.join(__dirname, 'icon.png');
@@ -389,12 +393,73 @@ function setupIPCHandlers() {
   });
 }
 
+// ── Calendar Event Notification Scheduler ──────────────────────────────────
+function scheduleCalendarNotifications() {
+  if (notificationTimer) clearInterval(notificationTimer);
+
+  function checkNow() {
+    if (!Notification.isSupported()) return;
+
+    const now = new Date();
+    const currentHH = now.getHours().toString().padStart(2, '0');
+    const currentMM = now.getMinutes().toString().padStart(2, '0');
+    const currentTimeStr = `${currentHH}:${currentMM}`;
+
+    let events = [];
+    try {
+      events = getTodayPlannedEvents();
+    } catch (err) {
+      // DB might not be ready yet — silently skip
+      return;
+    }
+
+    events.forEach((event) => {
+      if (!event.planned_start_time) return;
+      // planned_start_time is stored as 'HH:MM' or 'HH:MM:SS'
+      const eventTime = event.planned_start_time.slice(0, 5); // 'HH:MM'
+      if (eventTime !== currentTimeStr) return;
+
+      // Unique key per event + minute so we fire only once per scheduled minute
+      const notifyKey = `${event.id}-${currentTimeStr}`;
+      if (notifiedEvents.has(notifyKey)) return;
+      notifiedEvents.set(notifyKey, true);
+
+      // Clean up old keys to avoid memory leak (keep only today's)
+      if (notifiedEvents.size > 500) notifiedEvents.clear();
+
+      const durationText = event.estimated_minutes ? ` (${event.estimated_minutes} dk)` : '';
+      const notif = new Notification({
+        title: `⏰ Etkinlik Başlıyor: ${event.title}`,
+        body: `${currentTimeStr} saatinde planlandı${durationText}. Tıkla veya kapat.`,
+        urgency: 'critical',
+        timeoutType: 'never',   // stay until user dismisses
+        silent: false,
+      });
+
+      notif.on('click', () => {
+        // Bring FocusFlow window to front when user clicks the notification
+        if (mainWindow) {
+          if (!mainWindow.isVisible()) mainWindow.show();
+          mainWindow.focus();
+        }
+      });
+
+      notif.show();
+    });
+  }
+
+  // Run immediately on start, then every 30 seconds for accuracy
+  checkNow();
+  notificationTimer = setInterval(checkNow, 30_000);
+}
+
 app.whenReady().then(async () => {
   setupIPCHandlers();
   await initDatabase();
   createWindow();
   createTray();
   registerGlobalShortcuts();
+  scheduleCalendarNotifications();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -407,4 +472,5 @@ app.on('before-quit', () => {
 
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
+  if (notificationTimer) clearInterval(notificationTimer);
 });

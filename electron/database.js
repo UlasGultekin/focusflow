@@ -1137,3 +1137,23 @@ export function clearAllData() {
   saveDb();
   return { success: true };
 }
+
+export function getTodayPlannedEvents() {
+  if (!db) return [];
+  const today = new Date();
+  const dateStr = today.toISOString().slice(0, 10); // 'YYYY-MM-DD'
+  const result = db.exec(
+    `SELECT id, title, planned_start_time, estimated_minutes, status
+     FROM tasks
+     WHERE planned_date = ? AND planned_start_time IS NOT NULL AND planned_start_time != ''
+     ORDER BY planned_start_time ASC`,
+    [dateStr]
+  );
+  if (!result.length) return [];
+  const [{ columns, values }] = result;
+  return values.map((row) => {
+    const obj = {};
+    columns.forEach((col, i) => { obj[col] = row[i]; });
+    return obj;
+  });
+}
