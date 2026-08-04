@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Calendar as CalendarIcon,
   ChevronLeft,
@@ -9,6 +9,7 @@ import {
   Tag,
   CheckCircle2,
   CalendarDays,
+  StickyNote,
 } from 'lucide-react';
 import { useTaskStore } from '../stores/useTaskStore';
 import {
@@ -26,7 +27,7 @@ import { tr } from 'date-fns/locale';
 const HOURS = Array.from({ length: 17 }, (_, i) => i + 7); // 07:00 to 23:00
 
 export default function CalendarView() {
-  const { tasks, addTask, updateTask } = useTaskStore();
+  const { tasks, addTask, updateTask, allNotes, fetchAllNotes } = useTaskStore();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
   const [planTitle, setPlanTitle] = useState('');
@@ -42,6 +43,14 @@ export default function CalendarView() {
     (t) => t.planned_date && t.planned_date === selectedDateStr
   );
 
+  const dayNotes = (allNotes || []).filter(
+    (n) => n.planned_date && n.planned_date === selectedDateStr
+  );
+
+  useEffect(() => {
+    if (fetchAllNotes) fetchAllNotes();
+  }, []);
+
   // Unplanned tasks
   const unplannedTasks = tasks.filter((t) => !t.planned_date && t.status !== 'done');
 
@@ -50,6 +59,12 @@ export default function CalendarView() {
   dayTasks.forEach((t) => {
     if (t.planned_start_time) {
       const hour = parseInt(t.planned_start_time.split(':')[0], 10);
+      timeCounts[hour] = (timeCounts[hour] || 0) + 1;
+    }
+  });
+  dayNotes.forEach((n) => {
+    if (n.planned_start_time) {
+      const hour = parseInt(n.planned_start_time.split(':')[0], 10);
       timeCounts[hour] = (timeCounts[hour] || 0) + 1;
     }
   });
@@ -168,19 +183,26 @@ export default function CalendarView() {
         <div className="lg:col-span-3 bg-app-surface border border-app rounded-2xl p-5 shadow-xs space-y-1">
           <div className="text-xs font-bold text-app-secondary border-b border-app pb-3 mb-2 flex items-center justify-between">
             <span>Saatlik Çizelge</span>
-            <span>{dayTasks.length} Planlı Etkinlik</span>
+            <span>{dayTasks.length + dayNotes.length} Planlı Etkinlik</span>
           </div>
 
           <div className="space-y-2">
             {HOURS.map((hour) => {
               const hourStr = `${hour.toString().padStart(2, '0')}:00`;
+              
               const tasksForHour = dayTasks.filter((t) => {
                 if (!t.planned_start_time) return false;
                 const h = parseInt(t.planned_start_time.split(':')[0], 10);
                 return h === hour;
               });
 
-              const isOverlap = tasksForHour.length > 1;
+              const notesForHour = dayNotes.filter((n) => {
+                if (!n.planned_start_time) return false;
+                const h = parseInt(n.planned_start_time.split(':')[0], 10);
+                return h === hour;
+              });
+
+              const isOverlap = tasksForHour.length + notesForHour.length > 1;
 
               return (
                 <div
@@ -200,22 +222,43 @@ export default function CalendarView() {
                       </span>
                     )}
 
-                    {tasksForHour.length === 0 ? (
-                      <span className="text-[11px] text-app-muted opacity-0 group-hover:opacity-100 transition-opacity">
+                    {tasksForHour.length === 0 && notesForHour.length === 0 ? (
+                      <button 
+                        onClick={() => {
+                          setPlanTime(hourStr);
+                          setIsPlanModalOpen(true);
+                        }}
+                        className="text-[11px] text-app-muted opacity-0 group-hover:opacity-100 transition-opacity hover:text-app-primary cursor-pointer w-full text-left"
+                      >
                         + Etkinlik Ekle
-                      </span>
+                      </button>
                     ) : (
-                      tasksForHour.map((task) => (
-                        <div
-                          key={task.id}
-                          className="px-3 py-2 rounded-xl text-xs font-semibold text-white shadow-xs flex items-center gap-2"
-                          style={{ backgroundColor: task.color || '#5B8DEF' }}
-                        >
-                          <Clock className="w-3.5 h-3.5" />
-                          <span>{task.title}</span>
-                          <span className="text-[10px] opacity-80">({task.estimated_minutes}dk)</span>
-                        </div>
-                      ))
+                      <>
+                        {tasksForHour.map((task) => (
+                          <div
+                            key={'t-' + task.id}
+                            className="px-3 py-2 rounded-xl text-xs font-semibold text-white shadow-xs flex items-center gap-2"
+                            style={{ backgroundColor: task.color || '#5B8DEF' }}
+                          >
+                            <Clock className="w-3.5 h-3.5" />
+                            <span>{task.title}</span>
+                            <span className="text-[10px] opacity-80">({task.estimated_minutes}dk)</span>
+                          </div>
+                        ))}
+                        {notesForHour.map((note) => {
+                          const noteTitle = (note.content || '').split('\n')[0] || 'Not';
+                          return (
+                            <div
+                              key={'n-' + note.id}
+                              className="px-3 py-2 rounded-xl text-xs font-semibold text-app-primary bg-amber-500/10 border border-amber-500/20 shadow-xs flex items-center gap-2"
+                            >
+                              <StickyNote className="w-3.5 h-3.5 text-amber-500" />
+                              <span>{noteTitle}</span>
+                              <span className="text-[10px] opacity-80 text-app-muted">(Not)</span>
+                            </div>
+                          );
+                        })}
+                      </>
                     )}
                   </div>
                 </div>

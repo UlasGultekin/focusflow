@@ -11,6 +11,7 @@ const DEFAULT_MENU_LABELS = {
   search: 'Gelişmiş Arama',
   analytics: 'Analiz & Raporlar',
   settings: 'Ayarlar',
+  links: 'Linkler',
 };
 
 function loadMenuLabels() {
@@ -19,6 +20,14 @@ function loadMenuLabels() {
     if (saved) return { ...DEFAULT_MENU_LABELS, ...JSON.parse(saved) };
   } catch (_) {}
   return { ...DEFAULT_MENU_LABELS };
+}
+
+function loadHiddenTabs() {
+  try {
+    const saved = localStorage.getItem('focusflow_hidden_tabs');
+    if (saved) return JSON.parse(saved);
+  } catch (_) {}
+  return [];
 }
 
 export { DEFAULT_MENU_LABELS };
@@ -34,6 +43,7 @@ export const useSettingsStore = create((set, get) => ({
     long_break_interval: 4,
   },
   menuLabels: loadMenuLabels(),
+  hiddenTabs: loadHiddenTabs(),
   isLoading: false,
 
   fetchSettings: async () => {
@@ -107,6 +117,18 @@ export const useSettingsStore = create((set, get) => ({
     set({ menuLabels: reset });
     try {
       localStorage.removeItem('focusflow_menu_labels');
+    } catch (_) {}
+  },
+
+  toggleHiddenTab: (tabId) => {
+    const { hiddenTabs } = get();
+    const updated = hiddenTabs.includes(tabId)
+      ? hiddenTabs.filter(id => id !== tabId)
+      : [...hiddenTabs, tabId];
+    
+    set({ hiddenTabs: updated });
+    try {
+      localStorage.setItem('focusflow_hidden_tabs', JSON.stringify(updated));
     } catch (_) {}
   },
 }));

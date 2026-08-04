@@ -17,8 +17,10 @@ import {
   Volume2,
   VolumeX,
   Play,
+  EyeOff,
+  Eye,
 } from 'lucide-react';
-import { useSettingsStore } from '../stores/useSettingsStore';
+import { useSettingsStore, DEFAULT_MENU_LABELS } from '../stores/useSettingsStore';
 import { useTaskStore } from '../stores/useTaskStore';
 import { useHabitStore } from '../stores/useHabitStore';
 import { useSearchStore } from '../stores/useSearchStore';
@@ -39,6 +41,9 @@ export default function SettingsView() {
     updateHotkeys,
     pomodoro,
     updatePomodoroSettings,
+    hiddenTabs,
+    toggleHiddenTab,
+    menuLabels,
   } = useSettingsStore();
 
   const { tasks, fetchTasks } = useTaskStore();
@@ -490,7 +495,44 @@ export default function SettingsView() {
           </div>
         </div>
 
-        {/* 5. VERİ TEMİZLEME & SIFIRLAMA (YENİ ÖZELLİK) */}
+        {/* 5. Sekme Görünürlüğü (Yeni Özellik) */}
+        <div className="bg-app-surface border border-app rounded-2xl p-5 shadow-xs space-y-4">
+          <h3 className="text-sm font-bold text-app-primary flex items-center gap-2">
+            <EyeOff className="w-4 h-4 text-app-accent" /> Sekme Görünürlüğü
+          </h3>
+          <p className="text-xs text-app-secondary">
+            Sol menüde görünmesini istemediğiniz sekmeleri buradan gizleyip açabilirsiniz.
+          </p>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {Object.entries(DEFAULT_MENU_LABELS).map(([tabId, defaultLabel]) => {
+              if (tabId === 'settings') return null; // Ayarlar gizlenemez
+              const label = menuLabels[tabId] || defaultLabel;
+              const isHidden = hiddenTabs.includes(tabId);
+              
+              return (
+                <button
+                  key={tabId}
+                  onClick={() => toggleHiddenTab(tabId)}
+                  className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
+                    isHidden
+                      ? 'border-app bg-app-surface-hover text-app-muted'
+                      : 'border-app-accent bg-app-accent-light/30 text-app-primary'
+                  }`}
+                >
+                  <span className="text-xs font-semibold truncate pr-2">{label}</span>
+                  {isHidden ? (
+                    <EyeOff className="w-4 h-4 text-app-muted shrink-0" />
+                  ) : (
+                    <Eye className="w-4 h-4 text-app-accent shrink-0" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* 6. VERİ TEMİZLEME & SIFIRLAMA (YENİ ÖZELLİK) */}
         <div className="bg-app-surface border border-rose-500/30 rounded-2xl p-5 shadow-xs space-y-5">
           <div className="flex items-center justify-between border-b border-app pb-3">
             <h3 className="text-sm font-bold text-rose-500 flex items-center gap-2">

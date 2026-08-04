@@ -29,8 +29,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Notes
   getNotes: (taskId) => ipcRenderer.invoke('notes:get', taskId),
-  addNote: (content, taskId, category) => ipcRenderer.invoke('notes:add', content, taskId, category),
-  updateNote: (id, content, category) => ipcRenderer.invoke('notes:update', id, content, category),
+  addNote: (content, taskId, category, imagesJson, attachmentsJson, plannedDate, plannedStartTime) => 
+    ipcRenderer.invoke('notes:add', content, taskId, category, imagesJson, attachmentsJson, plannedDate, plannedStartTime),
+  updateNote: (id, content, category, imagesJson, attachmentsJson, plannedDate, plannedStartTime) => 
+    ipcRenderer.invoke('notes:update', id, content, category, imagesJson, attachmentsJson, plannedDate, plannedStartTime),
   deleteNote: (id) => ipcRenderer.invoke('notes:delete', id),
 
   // Habits
@@ -48,12 +50,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
   endCourseSession: (sessionId) => ipcRenderer.invoke('courses:endSession', sessionId),
   openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
 
+  // Links
+  getLinks: () => ipcRenderer.invoke('links:get'),
+  addLink: (linkData) => ipcRenderer.invoke('links:add', linkData),
+  updateLink: (id, linkData) => ipcRenderer.invoke('links:update', id, linkData),
+  deleteLink: (id) => ipcRenderer.invoke('links:delete', id),
+
   // Attachments (Görev 15)
   getTaskAttachments: (taskId) => ipcRenderer.invoke('attachments:get', taskId),
   selectFileAttachment: (taskId) => ipcRenderer.invoke('attachments:selectFile', taskId),
   selectFolderAttachment: (taskId) => ipcRenderer.invoke('attachments:selectFolder', taskId),
   deleteTaskAttachment: (id) => ipcRenderer.invoke('attachments:delete', id),
   openPath: (path) => ipcRenderer.invoke('shell:openPath', path),
+
+  selectFile: () => ipcRenderer.invoke('dialog:selectFile'),
+  selectFolder: () => ipcRenderer.invoke('dialog:selectFolder'),
 
   // Journal (Görev 16)
   getJournalEntry: (dateStr) => ipcRenderer.invoke('journal:get', dateStr),

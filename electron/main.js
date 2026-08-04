@@ -35,6 +35,10 @@ import {
   deleteCourse,
   startCourseSession,
   endCourseSession,
+  getLinks,
+  addLink,
+  deleteLink,
+  updateLink,
   getTaskAttachments,
   addTaskAttachment,
   deleteTaskAttachment,
@@ -234,8 +238,10 @@ function setupIPCHandlers() {
 
   // Notes
   ipcMain.handle('notes:get', (_, taskId) => getNotes(taskId));
-  ipcMain.handle('notes:add', (_, content, taskId, category) => addNote(content, taskId, category));
-  ipcMain.handle('notes:update', (_, id, content, category) => updateNote(id, content, null, category));
+  ipcMain.handle('notes:add', (_, content, taskId, category, imagesJson, attachmentsJson, plannedDate, plannedStartTime) => 
+    addNote(content, taskId, category, imagesJson, attachmentsJson, plannedDate, plannedStartTime));
+  ipcMain.handle('notes:update', (_, id, content, category, imagesJson, attachmentsJson, plannedDate, plannedStartTime) => 
+    updateNote(id, content, null, category, imagesJson, attachmentsJson, plannedDate, plannedStartTime));
   ipcMain.handle('notes:delete', (_, id) => deleteNote(id));
 
   // Habits
@@ -252,6 +258,12 @@ function setupIPCHandlers() {
   ipcMain.handle('courses:startSession', (_, courseId) => startCourseSession(courseId));
   ipcMain.handle('courses:endSession', (_, sessionId) => endCourseSession(sessionId));
 
+  // Links
+  ipcMain.handle('links:get', () => getLinks());
+  ipcMain.handle('links:add', (_, linkData) => addLink(linkData));
+  ipcMain.handle('links:update', (_, id, linkData) => updateLink(id, linkData));
+  ipcMain.handle('links:delete', (_, id) => deleteLink(id));
+
   // Attachments (Görev 15)
   ipcMain.handle('attachments:get', (_, taskId) => getTaskAttachments(taskId));
   ipcMain.handle('attachments:selectFile', async (_, taskId) => {
@@ -264,6 +276,30 @@ function setupIPCHandlers() {
       const selectedPath = result.filePaths[0];
       const fileName = path.basename(selectedPath);
       return addTaskAttachment(taskId, fileName, selectedPath, 'file');
+    }
+    return null;
+  });
+
+  ipcMain.handle('dialog:selectFile', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Dosya Seç',
+      properties: ['openFile'],
+    });
+    if (!result.canceled && result.filePaths.length > 0) {
+      const selectedPath = result.filePaths[0];
+      return { path: selectedPath, name: path.basename(selectedPath), type: 'file' };
+    }
+    return null;
+  });
+
+  ipcMain.handle('dialog:selectFolder', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Klasör Seç',
+      properties: ['openDirectory'],
+    });
+    if (!result.canceled && result.filePaths.length > 0) {
+      const selectedPath = result.filePaths[0];
+      return { path: selectedPath, name: path.basename(selectedPath), type: 'folder' };
     }
     return null;
   });

@@ -7,6 +7,7 @@ import TaskModal from './components/TaskModal';
 import BoardView from './components/BoardView';
 import CalendarView from './components/CalendarView';
 import CoursesView from './components/CoursesView';
+import LinksView from './components/LinksView';
 import HabitsView from './components/HabitsView';
 import JournalView from './components/JournalView';
 import NotesView from './components/NotesView';
@@ -130,6 +131,8 @@ export default function App() {
         {currentTab === 'calendar' && <CalendarView />}
 
         {currentTab === 'courses' && <CoursesView />}
+
+        {currentTab === 'links' && <LinksView />}
 
         {currentTab === 'habits' && <HabitsView />}
 

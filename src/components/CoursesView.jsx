@@ -13,6 +13,7 @@ import {
   Hourglass,
 } from 'lucide-react';
 import { useCourseStore } from '../stores/useCourseStore';
+import { useLinkStore } from '../stores/useLinkStore';
 
 export default function CoursesView() {
   const {
@@ -32,6 +33,7 @@ export default function CoursesView() {
   const [url, setUrl] = useState('');
   const [category, setCategory] = useState('Yazılım');
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const { addLink } = useLinkStore();
 
   useEffect(() => {
     fetchCourses();
@@ -82,6 +84,15 @@ export default function CoursesView() {
       }
       await startCourseSession(courseId);
     }
+  };
+
+  const handleCopyToLinks = async (course) => {
+    await addLink({
+      title: course.title,
+      url: course.url || '',
+      category: 'Eğitim',
+    });
+    alert('Linkler sekmesine eklendi!');
   };
 
   return (
@@ -192,15 +203,25 @@ export default function CoursesView() {
                 {/* Right: Action Buttons */}
                 <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end border-t md:border-t-0 pt-3 md:pt-0 border-app">
                   {/* External Browser Button */}
-                  {course.url ? (
+                  <div className="flex items-center gap-2 shrink-0">
+                    {course.url && (
+                      <button
+                        onClick={() => openExternalLink(course.url)}
+                        className="px-3.5 py-2 rounded-xl border border-app bg-app-primary text-app-primary font-semibold text-xs hover:border-app-accent hover:text-app-accent transition-all flex items-center gap-1.5"
+                        title={course.url}
+                      >
+                        <ExternalLink className="w-3.5 h-3.5 text-indigo-500" /> Tarayıcıda Aç
+                      </button>
+                    )}
+                    
                     <button
-                      onClick={() => openExternalLink(course.url)}
-                      className="px-3.5 py-2 rounded-xl border border-app bg-app-primary text-app-primary font-semibold text-xs hover:border-app-accent hover:text-app-accent transition-all flex items-center gap-1.5 shrink-0"
-                      title={course.url}
+                      onClick={() => handleCopyToLinks(course)}
+                      className="px-3.5 py-2 rounded-xl border border-app bg-app-primary text-app-primary font-semibold text-xs hover:border-emerald-500 hover:text-emerald-500 transition-all flex items-center gap-1.5"
+                      title="Linkler sekmesine kaydet"
                     >
-                      <ExternalLink className="w-3.5 h-3.5 text-indigo-500" /> Tarayıcıda Aç
+                      <Link2 className="w-3.5 h-3.5 text-emerald-500" /> Linklere Ekle
                     </button>
-                  ) : null}
+                  </div>
 
                   {/* Start/Stop Learning Session Button with Live Elapsed Display */}
                   <button

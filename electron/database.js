@@ -75,6 +75,7 @@ export async function initDatabase() {
       task_id INTEGER,
       content TEXT NOT NULL,
       category TEXT DEFAULT 'Genel',
+      images_json TEXT DEFAULT '[]',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -114,6 +115,14 @@ export async function initDatabase() {
       end_time TEXT,
       duration_seconds INTEGER,
       FOREIGN KEY (course_id) REFERENCES courses (id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS links (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      url TEXT,
+      category TEXT DEFAULT 'Genel',
+      created_at TEXT NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS task_attachments (
@@ -204,6 +213,23 @@ export async function initDatabase() {
 
     db.run("UPDATE tasks SET status = 'todo' WHERE status = 'active'");
     db.run("UPDATE tasks SET status = 'done' WHERE status = 'completed'");
+
+    // Add columns dynamically for backwards compatibility
+    try {
+      db.run("ALTER TABLE notes ADD COLUMN attachments_json TEXT");
+    } catch (e) {
+      // Column might already exist
+    }
+    try {
+      db.run("ALTER TABLE notes ADD COLUMN planned_date TEXT");
+    } catch (e) {
+      // Column might already exist
+    }
+    try {
+      db.run("ALTER TABLE notes ADD COLUMN planned_start_time TEXT");
+    } catch (e) {
+      // Column might already exist
+    }
 
     // notes tablosuna category sütunu ekle
     const notesInfo = db.exec("PRAGMA table_info(notes)");
@@ -715,16 +741,15 @@ export function getNotes(taskId = null) {
   if (taskId) {
     query += ` WHERE task_id = ${taskId}`;
   }
-  query += ' ORDER BY updated_at DESC';
-  const res = db.exec(query);
-  return resultToObjects(res);
+  query += ' ORDER BY created_at DESC';
+  return resultToObjects(db.exec(query));
 }
 
-export function addNote(content, taskId = null, category = 'Genel') {
+export function addNote(content, taskId = null, category = 'Genel', imagesJson = '[]', attachmentsJson = '[]', plannedDate = null, plannedStartTime = null) {
   const now = new Date().toISOString();
   db.run(
-    `INSERT INTO notes (task_id, content, category, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
-    [taskId, content, category || 'Genel', now, now]
+    `INSERT INTO notes (content, task_id, category, images_json, attachments_json, planned_date, planned_start_time, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [content, taskId, category, imagesJson, attachmentsJson, plannedDate, plannedStartTime, now, now]
   );
   saveDb();
   const newNote = getLastInserted('notes');
@@ -735,19 +760,12 @@ export function addNote(content, taskId = null, category = 'Genel') {
   return newNote;
 }
 
-export function updateNote(id, content, taskId = null, category = null) {
+export function updateNote(id, content, taskId = null, category = null, imagesJson = null, attachmentsJson = null, plannedDate = null, plannedStartTime = null) {
   const now = new Date().toISOString();
-  if (category !== null) {
-    db.run(
-      `UPDATE notes SET content = ?, category = ?, updated_at = ? WHERE id = ${id}`,
-      [content, category, now]
-    );
-  } else {
-    db.run(
-      `UPDATE notes SET content = ?, updated_at = ? WHERE id = ${id}`,
-      [content, now]
-    );
-  }
+  db.run(
+    `UPDATE notes SET content = ?, category = COALESCE(?, category), images_json = COALESCE(?, images_json), attachments_json = COALESCE(?, attachments_json), planned_date = COALESCE(?, planned_date), planned_start_time = COALESCE(?, planned_start_time), updated_at = ? WHERE id = ?`,
+    [content, category, imagesJson, attachmentsJson, plannedDate, plannedStartTime, now, id]
+  );
   saveDb();
   const updatedRes = db.exec(`SELECT * FROM notes WHERE id = ${id}`);
   const updated = resultToObjects(updatedRes)[0];
@@ -1156,4 +1174,35 @@ export function getTodayPlannedEvents() {
     columns.forEach((col, i) => { obj[col] = row[i]; });
     return obj;
   });
+}
+
+// LINKLER İŞLEMLERİ
+export function getLinks() {
+  const res = db.exec('SELECT * FROM links ORDER BY created_at DESC');
+  return resultToObjects(res);
+}
+
+export function addLink(linkData) {
+  const now = new Date().toISOString();
+  db.run(
+    `INSERT INTO links (title, url, category, created_at) VALUES (?, ?, ?, ?)`,
+    [linkData.title, linkData.url || '', linkData.category || 'Genel', now]
+  );
+  saveDb();
+  return getLastInserted('links');
+}
+
+export function updateLink(id, linkData) {
+  db.run(
+    `UPDATE links SET title = ?, url = ?, category = ? WHERE id = ?`,
+    [linkData.title, linkData.url || '', linkData.category || 'Genel', id]
+  );
+  saveDb();
+  return true;
+}
+
+export function deleteLink(id) {
+  db.run(`DELETE FROM links WHERE id = ${id}`);
+  saveDb();
+  return true;
 }

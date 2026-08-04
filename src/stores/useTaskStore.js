@@ -153,17 +153,25 @@ export const useTaskStore = create((set, get) => ({
     }
   },
 
-  addNote: async (content, taskId, category) => {
+  addNote: async (content, taskId, category, images, attachments = [], plannedDate = null, plannedStartTime = null) => {
     if (window.electronAPI) {
-      const newNote = await window.electronAPI.addNote(content, taskId || null, category || 'Genel');
+      const imagesJson = JSON.stringify(images || []);
+      const attachmentsJson = JSON.stringify(attachments || []);
+      const newNote = await window.electronAPI.addNote(
+        content, taskId || null, category || 'Genel', imagesJson, attachmentsJson, plannedDate, plannedStartTime
+      );
       await get().fetchAllNotes();
       return newNote;
     }
   },
 
-  updateNote: async (id, content, taskId, category) => {
+  updateNote: async (id, content, taskId, category, images, attachments = [], plannedDate = null, plannedStartTime = null) => {
     if (window.electronAPI) {
-      const updated = await window.electronAPI.updateNote(id, content, category);
+      const imagesJson = images !== undefined ? JSON.stringify(images || []) : null;
+      const attachmentsJson = attachments !== undefined ? JSON.stringify(attachments || []) : null;
+      const updated = await window.electronAPI.updateNote(
+        id, content, category, imagesJson, attachmentsJson, plannedDate, plannedStartTime
+      );
       await get().fetchAllNotes();
       return updated;
     }

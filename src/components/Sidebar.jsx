@@ -2,12 +2,12 @@ import React, { useState } from 'react';
 import {
   LayoutList, Kanban, Calendar, GraduationCap, Flame, BookHeart,
   NotebookPen, BarChart3, Search, Settings, Sparkles, Moon, Sun,
-  Pencil, Check, X, RotateCcw,
+  Pencil, Check, X, RotateCcw, Link2,
 } from 'lucide-react';
 import { useSettingsStore, DEFAULT_MENU_LABELS } from '../stores/useSettingsStore';
 
 export default function Sidebar({ currentTab, setCurrentTab }) {
-  const { theme, setTheme, compactMode, menuLabels, setMenuLabel, resetMenuLabels } = useSettingsStore();
+  const { theme, setTheme, compactMode, menuLabels, setMenuLabel, resetMenuLabels, hiddenTabs } = useSettingsStore();
 
   const [editingId, setEditingId] = useState(null);
   const [editingValue, setEditingValue] = useState('');
@@ -18,6 +18,7 @@ export default function Sidebar({ currentTab, setCurrentTab }) {
     { id: 'board', icon: Kanban },
     { id: 'calendar', icon: Calendar },
     { id: 'courses', icon: GraduationCap },
+    { id: 'links', icon: Link2 },
     { id: 'habits', icon: Flame },
     { id: 'journal', icon: BookHeart },
     { id: 'notes', icon: NotebookPen },
@@ -96,7 +97,7 @@ export default function Sidebar({ currentTab, setCurrentTab }) {
 
       {/* Navigation Items */}
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-        {menuItems.map((item) => {
+        {menuItems.filter(item => !hiddenTabs.includes(item.id) || isEditMode).map((item) => {
           const Icon = item.icon;
           const isActive = currentTab === item.id;
           const label = menuLabels[item.id] || DEFAULT_MENU_LABELS[item.id];
