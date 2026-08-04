@@ -57,7 +57,15 @@ import {
   clearDataByDateRange,
   clearAllData,
   getYesterdaySummary,
-  getTodayPlannedEvents
+  getTodayPlannedEvents,
+  getTechDebts,
+  addTechDebt,
+  updateTechDebt,
+  deleteTechDebt,
+  getBugs,
+  addBug,
+  updateBug,
+  deleteBug
 } from './database.js';
 
 const { app, BrowserWindow, ipcMain, Tray, Menu, globalShortcut, Notification, dialog, nativeImage, shell } = electron;
@@ -263,6 +271,18 @@ function setupIPCHandlers() {
   ipcMain.handle('links:add', (_, linkData) => addLink(linkData));
   ipcMain.handle('links:update', (_, id, linkData) => updateLink(id, linkData));
   ipcMain.handle('links:delete', (_, id) => deleteLink(id));
+
+  // Tech Debts (Görev 27)
+  ipcMain.handle('techDebts:get', () => getTechDebts());
+  ipcMain.handle('techDebts:add', (_, data) => addTechDebt(data));
+  ipcMain.handle('techDebts:update', (_, id, data) => updateTechDebt(id, data));
+  ipcMain.handle('techDebts:delete', (_, id) => deleteTechDebt(id));
+
+  // Bugs (Görev 27)
+  ipcMain.handle('bugs:get', () => getBugs());
+  ipcMain.handle('bugs:add', (_, data) => addBug(data));
+  ipcMain.handle('bugs:update', (_, id, data) => updateBug(id, data));
+  ipcMain.handle('bugs:delete', (_, id) => deleteBug(id));
 
   // Attachments (Görev 15)
   ipcMain.handle('attachments:get', (_, taskId) => getTaskAttachments(taskId));

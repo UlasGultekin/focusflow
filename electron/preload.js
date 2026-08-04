@@ -56,6 +56,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
   updateLink: (id, linkData) => ipcRenderer.invoke('links:update', id, linkData),
   deleteLink: (id) => ipcRenderer.invoke('links:delete', id),
 
+  // Tech Debts (Görev 27)
+  getTechDebts: () => ipcRenderer.invoke('techDebts:get'),
+  addTechDebt: (data) => ipcRenderer.invoke('techDebts:add', data),
+  updateTechDebt: (id, data) => ipcRenderer.invoke('techDebts:update', id, data),
+  deleteTechDebt: (id) => ipcRenderer.invoke('techDebts:delete', id),
+
+  // Bugs (Görev 27)
+  getBugs: () => ipcRenderer.invoke('bugs:get'),
+  addBug: (data) => ipcRenderer.invoke('bugs:add', data),
+  updateBug: (id, data) => ipcRenderer.invoke('bugs:update', id, data),
+  deleteBug: (id) => ipcRenderer.invoke('bugs:delete', id),
+
   // Attachments (Görev 15)
   getTaskAttachments: (taskId) => ipcRenderer.invoke('attachments:get', taskId),
   selectFileAttachment: (taskId) => ipcRenderer.invoke('attachments:selectFile', taskId),

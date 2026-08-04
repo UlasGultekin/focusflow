@@ -14,6 +14,8 @@ import NotesView from './components/NotesView';
 import SearchView from './components/SearchView';
 import AnalyticsView from './components/AnalyticsView';
 import SettingsView from './components/SettingsView';
+import BugsView from './components/BugsView';
+import TechDebtsView from './components/TechDebtsView';
 import CommandPaletteModal from './components/CommandPaletteModal';
 import SessionEndModal from './components/SessionEndModal';
 import YesterdaySummaryToast from './components/YesterdaySummaryToast';
@@ -139,6 +141,10 @@ export default function App() {
         {currentTab === 'journal' && <JournalView />}
 
         {currentTab === 'notes' && <NotesView />}
+
+        {currentTab === 'bugs' && <BugsView />}
+
+        {currentTab === 'tech_debts' && <TechDebtsView />}
 
         {currentTab === 'search' && (
           <SearchView onNavigate={handleSearchResultNavigation} />

@@ -182,6 +182,38 @@ export async function initDatabase() {
       hotkeys TEXT DEFAULT 'Ctrl+Shift+Space',
       backup_path TEXT DEFAULT ''
     );
+
+    CREATE TABLE IF NOT EXISTS tech_debts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      description TEXT,
+      category TEXT DEFAULT 'refactor',
+      estimated_minutes INTEGER,
+      status TEXT DEFAULT 'open',
+      priority TEXT DEFAULT 'medium',
+      planned_date TEXT,
+      task_id INTEGER,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS bugs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      description TEXT,
+      severity TEXT DEFAULT 'minor',
+      reproduction_steps TEXT,
+      environment TEXT,
+      status TEXT DEFAULT 'open',
+      priority TEXT DEFAULT 'medium',
+      planned_date TEXT,
+      fix_commit TEXT,
+      task_id INTEGER,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL
+    );
   `);
 
   // Güvenli Migrasyonlar
@@ -237,6 +269,34 @@ export async function initDatabase() {
       const notesCols = notesInfo[0].values.map((col) => col[1]);
       if (!notesCols.includes('category')) {
         db.run("ALTER TABLE notes ADD COLUMN category TEXT DEFAULT 'Genel'");
+      }
+    }
+
+    const bugsInfo = db.exec("PRAGMA table_info(bugs)");
+    if (bugsInfo.length > 0) {
+      const bugsCols = bugsInfo[0].values.map((col) => col[1]);
+      if (!bugsCols.includes('images_json')) {
+        db.run("ALTER TABLE bugs ADD COLUMN images_json TEXT DEFAULT '[]'");
+      }
+      if (!bugsCols.includes('attachments_json')) {
+        db.run("ALTER TABLE bugs ADD COLUMN attachments_json TEXT DEFAULT '[]'");
+      }
+      if (!bugsCols.includes('project')) {
+        db.run("ALTER TABLE bugs ADD COLUMN project TEXT DEFAULT 'Genel'");
+      }
+    }
+
+    const tdInfo = db.exec("PRAGMA table_info(tech_debts)");
+    if (tdInfo.length > 0) {
+      const tdCols = tdInfo[0].values.map((col) => col[1]);
+      if (!tdCols.includes('images_json')) {
+        db.run("ALTER TABLE tech_debts ADD COLUMN images_json TEXT DEFAULT '[]'");
+      }
+      if (!tdCols.includes('attachments_json')) {
+        db.run("ALTER TABLE tech_debts ADD COLUMN attachments_json TEXT DEFAULT '[]'");
+      }
+      if (!tdCols.includes('project')) {
+        db.run("ALTER TABLE tech_debts ADD COLUMN project TEXT DEFAULT 'Genel'");
       }
     }
   } catch (err) {
@@ -1139,7 +1199,7 @@ export function clearAllData() {
   db.run("DELETE FROM search_index");
 
   // Reset SQLite auto-increment sequences so new IDs start from 1
-  db.run("DELETE FROM sqlite_sequence WHERE name IN ('tasks','subtasks','task_sessions','notes','habits','habit_completions','courses','course_sessions','task_attachments','journal_entries','task_links','search_index')");
+  db.run("DELETE FROM sqlite_sequence WHERE name IN ('tasks','subtasks','task_sessions','notes','habits','habit_completions','courses','course_sessions','task_attachments','journal_entries','task_links','search_index','tech_debts','bugs')");
 
   // Ensure settings rows still exist (re-insert if somehow missing)
   const pomodoroCheck = db.exec("SELECT COUNT(*) as c FROM pomodoro_settings");
@@ -1203,6 +1263,123 @@ export function updateLink(id, linkData) {
 
 export function deleteLink(id) {
   db.run(`DELETE FROM links WHERE id = ${id}`);
+  saveDb();
+  return true;
+}
+
+// ==========================
+// TECH DEBTS CRUD
+// ==========================
+export function getTechDebts() {
+  const res = db.exec('SELECT * FROM tech_debts ORDER BY created_at DESC');
+  return resultToObjects(res);
+}
+
+export function addTechDebt(data) {
+  const now = new Date().toISOString();
+  db.run(
+    `INSERT INTO tech_debts (title, description, category, estimated_minutes, status, priority, planned_date, task_id, images_json, attachments_json, project, created_at, updated_at) 
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      data.title, 
+      data.description || '', 
+      data.category || 'refactor', 
+      data.estimated_minutes || 60, 
+      data.status || 'open', 
+      data.priority || 'medium', 
+      data.planned_date || null, 
+      data.task_id || null, 
+      data.images_json || '[]',
+      data.attachments_json || '[]',
+      data.project || 'Genel',
+      now, 
+      now
+    ]
+  );
+  saveDb();
+  return getLastInserted('tech_debts');
+}
+
+export function updateTechDebt(id, data) {
+  const now = new Date().toISOString();
+  // Build dynamic update
+  const updates = [];
+  const values = [];
+  for (const key in data) {
+    updates.push(`${key} = ?`);
+    values.push(data[key]);
+  }
+  if (updates.length > 0) {
+    updates.push(`updated_at = ?`);
+    values.push(now);
+    values.push(id);
+    db.run(`UPDATE tech_debts SET ${updates.join(', ')} WHERE id = ?`, values);
+    saveDb();
+  }
+  return true;
+}
+
+export function deleteTechDebt(id) {
+  db.run(`DELETE FROM tech_debts WHERE id = ${id}`);
+  saveDb();
+  return true;
+}
+
+// ==========================
+// BUGS CRUD
+// ==========================
+export function getBugs() {
+  const res = db.exec('SELECT * FROM bugs ORDER BY created_at DESC');
+  return resultToObjects(res);
+}
+
+export function addBug(data) {
+  const now = new Date().toISOString();
+  db.run(
+    `INSERT INTO bugs (title, description, severity, reproduction_steps, environment, status, priority, planned_date, fix_commit, task_id, images_json, attachments_json, project, created_at, updated_at) 
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      data.title, 
+      data.description || '', 
+      data.severity || 'minor', 
+      data.reproduction_steps || '', 
+      data.environment || '', 
+      data.status || 'open', 
+      data.priority || 'medium', 
+      data.planned_date || null, 
+      data.fix_commit || '', 
+      data.task_id || null, 
+      data.images_json || '[]',
+      data.attachments_json || '[]',
+      data.project || 'Genel',
+      now, 
+      now
+    ]
+  );
+  saveDb();
+  return getLastInserted('bugs');
+}
+
+export function updateBug(id, data) {
+  const now = new Date().toISOString();
+  const updates = [];
+  const values = [];
+  for (const key in data) {
+    updates.push(`${key} = ?`);
+    values.push(data[key]);
+  }
+  if (updates.length > 0) {
+    updates.push(`updated_at = ?`);
+    values.push(now);
+    values.push(id);
+    db.run(`UPDATE bugs SET ${updates.join(', ')} WHERE id = ?`, values);
+    saveDb();
+  }
+  return true;
+}
+
+export function deleteBug(id) {
+  db.run(`DELETE FROM bugs WHERE id = ${id}`);
   saveDb();
   return true;
 }

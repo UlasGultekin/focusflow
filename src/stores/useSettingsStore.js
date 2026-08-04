@@ -12,6 +12,8 @@ const DEFAULT_MENU_LABELS = {
   analytics: 'Analiz & Raporlar',
   settings: 'Ayarlar',
   links: 'Linkler',
+  bugs: 'Hatalar (Bugs)',
+  tech_debts: 'Teknik Borçlar',
 };
 
 function loadMenuLabels() {

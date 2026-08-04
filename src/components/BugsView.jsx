@@ -1,0 +1,392 @@
+import React, { useEffect, useState, useCallback } from 'react';
+import { useBugStore } from '../stores/useBugStore';
+import { Bug, Plus, Trash2, ArrowRight, CheckCircle2, Clock, X, Folder, File, Image as ImageIcon, Paperclip } from 'lucide-react';
+
+function parseJsonField(jsonStr) {
+  try {
+    const parsed = JSON.parse(jsonStr || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function Lightbox({ src, onClose }) {
+  useEffect(() => {
+    const handler = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
+
+  return (
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex items-center justify-center animate-in fade-in duration-200"
+    >
+      <button
+        onClick={onClose}
+        className="absolute top-6 right-6 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-colors"
+      >
+        <X size={20} />
+      </button>
+      <img
+        src={src}
+        onClick={(e) => e.stopPropagation()}
+        className="max-w-[90vw] max-h-[88vh] rounded-xl shadow-2xl animate-in zoom-in-95 duration-200"
+        alt="Önizleme"
+      />
+    </div>
+  );
+}
+
+function ImageStrip({ images, onRemove, onOpen }) {
+  if (!images || images.length === 0) return null;
+  return (
+    <div className="flex gap-2 flex-wrap mt-3">
+      {images.map((src, i) => (
+        <div key={i} className="relative group inline-block">
+          <img
+            src={src}
+            alt={`görsel-${i + 1}`}
+            onClick={() => onOpen && onOpen(src)}
+            className="w-16 h-16 md:w-20 md:h-20 object-cover rounded-xl cursor-pointer border border-app shadow-sm transition-transform duration-200 group-hover:scale-105 group-hover:shadow-md"
+          />
+          {onRemove && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onRemove(i); }}
+              className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:bg-red-600"
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export default function BugsView() {
+  const { bugs, fetchBugs, addBug, deleteBug, updateBug, convertToTask } = useBugStore();
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [severity, setSeverity] = useState('minor');
+  const [reproductionSteps, setReproductionSteps] = useState('');
+  const [environment, setEnvironment] = useState('');
+  const [plannedDate, setPlannedDate] = useState('');
+  
+  const [images, setImages] = useState([]);
+  const [attachments, setAttachments] = useState([]);
+  const [lightboxSrc, setLightboxSrc] = useState(null);
+
+  const [project, setProject] = useState('Genel');
+  const [projectFilter, setProjectFilter] = useState('all');
+  
+  // Custom projects
+  const [availableProjects, setAvailableProjects] = useState(() => {
+    try {
+      const saved = localStorage.getItem('focusflow_projects');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return ['Genel', 'Frontend', 'Backend', 'Mobil', 'Diğer'];
+  });
+  const [showNewProjectInput, setShowNewProjectInput] = useState(false);
+  const [newProjectName, setNewProjectName] = useState('');
+
+  const handleAddNewProject = () => {
+    if (newProjectName.trim() && !availableProjects.includes(newProjectName.trim())) {
+      const updated = [...availableProjects, newProjectName.trim()];
+      setAvailableProjects(updated);
+      localStorage.setItem('focusflow_projects', JSON.stringify(updated));
+      setProject(newProjectName.trim());
+    }
+    setNewProjectName('');
+    setShowNewProjectInput(false);
+  };
+
+  useEffect(() => {
+    fetchBugs();
+  }, []);
+
+  const readFileAsDataURL = (file) => new Promise((res) => {
+    const reader = new FileReader();
+    reader.onload = (e) => res(e.target.result);
+    reader.readAsDataURL(file);
+  });
+
+  const handleImageFiles = useCallback(async (files) => {
+    const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
+    if (!imageFiles.length) return;
+    const dataUrls = await Promise.all(imageFiles.map(readFileAsDataURL));
+    setImages(prev => [...prev, ...dataUrls]);
+  }, []);
+
+  const handlePaste = useCallback(async (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    const imageItems = Array.from(items).filter(it => it.type.startsWith('image/'));
+    if (!imageItems.length) return;
+    e.preventDefault();
+    const files = imageItems.map(it => it.getAsFile()).filter(Boolean);
+    await handleImageFiles(files);
+  }, [handleImageFiles]);
+
+  const handleDrop = useCallback(async (e) => {
+    e.preventDefault();
+    await handleImageFiles(e.dataTransfer.files);
+  }, [handleImageFiles]);
+
+  const handleAddAttachment = async (type) => {
+    if (!window.electronAPI) return;
+    const res = type === 'file' ? await window.electronAPI.selectFile() : await window.electronAPI.selectFolder();
+    if (res) {
+      setAttachments(prev => [...prev, res]);
+    }
+  };
+
+  const handleAddBug = async (e) => {
+    e.preventDefault();
+    if (!title.trim()) return;
+
+    await addBug({
+      title,
+      description,
+      severity,
+      reproduction_steps: reproductionSteps,
+      environment,
+      planned_date: plannedDate || null,
+      images_json: JSON.stringify(images),
+      attachments_json: JSON.stringify(attachments),
+      project
+    });
+
+    setIsModalOpen(false);
+    setTitle('');
+    setDescription('');
+    setSeverity('minor');
+    setReproductionSteps('');
+    setEnvironment('');
+    setPlannedDate('');
+    setImages([]);
+    setAttachments([]);
+    setProject('Genel');
+  };
+
+  const filteredBugs = projectFilter === 'all' 
+    ? bugs 
+    : bugs.filter(b => (b.project || 'Genel') === projectFilter);
+
+  return (
+    <div className="h-full flex flex-col bg-app-bg text-app-primary overflow-hidden">
+      <header className="px-6 py-4 border-b border-app flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-rose-500/20 text-rose-500 rounded-xl">
+            <Bug className="w-5 h-5" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold">Açık Bug'lar</h1>
+            <p className="text-xs text-app-secondary">Uygulama hatalarını takip et</p>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          <select
+            value={projectFilter}
+            onChange={(e) => setProjectFilter(e.target.value)}
+            className="px-3 py-2 rounded-xl border border-app bg-app-primary text-app-primary text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-app-accent cursor-pointer min-w-[140px]"
+          >
+            <option value="all">🗂 Tüm Projeler</option>
+            {availableProjects.map(p => (
+              <option key={p} value={p}>{p}</option>
+            ))}
+          </select>
+
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="bg-app-primary text-app-primary border border-app hover:border-app-accent px-4 py-2 rounded-xl text-sm font-semibold transition-all flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" /> Yeni Bug Bildir
+          </button>
+        </div>
+      </header>
+
+      <div className="flex-1 overflow-y-auto p-6 space-y-4">
+        {filteredBugs.length === 0 ? (
+          <div className="text-center p-10 text-app-secondary">Henüz bir bug bildirilmedi.</div>
+        ) : (
+          filteredBugs.map((bug) => {
+            const parsedImages = parseJsonField(bug.images_json);
+            const parsedAttachments = parseJsonField(bug.attachments_json);
+
+            return (
+              <div key={bug.id} className={`p-4 rounded-xl border bg-app-surface transition-all ${bug.task_id ? 'opacity-60 border-app border-dashed' : 'border-app hover:border-rose-500/50'}`}>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="px-2 py-0.5 rounded text-xs font-semibold bg-rose-500/10 text-rose-500">
+                        {bug.severity.toUpperCase()}
+                      </span>
+                      {bug.task_id && (
+                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-emerald-500/10 text-emerald-500 flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3" /> Göreve Dönüştürüldü
+                        </span>
+                      )}
+                      {bug.planned_date && (
+                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-amber-500/10 text-amber-600 flex items-center gap-1">
+                          <Clock className="w-3 h-3" /> Takvime Planlandı: {bug.planned_date}
+                        </span>
+                      )}
+                      <span className="px-2 py-0.5 rounded text-xs font-semibold bg-app-bg border border-app text-app-secondary">
+                        {bug.project || 'Genel'}
+                      </span>
+                    </div>
+                    <h3 className="text-base font-bold">{bug.title}</h3>
+                    {bug.description && <p className="text-sm text-app-secondary mt-1">{bug.description}</p>}
+                    
+                    {/* Bug Images */}
+                    <ImageStrip images={parsedImages} onOpen={setLightboxSrc} />
+
+                    {/* Bug Attachments */}
+                    {parsedAttachments.length > 0 && (
+                      <div className="flex flex-col gap-1.5 mt-2">
+                        {parsedAttachments.map((att, i) => (
+                          <div 
+                            key={i} 
+                            onClick={() => window.electronAPI?.openPath(att.path)}
+                            className="flex items-center gap-2 p-2 rounded-xl bg-app-primary border border-app hover:border-app-accent/40 cursor-pointer transition-colors w-max pr-6 group/att"
+                          >
+                            {att.type === 'folder' ? <Folder size={14} className="text-amber-500" /> : <File size={14} className="text-blue-500" />}
+                            <span className="text-xs font-medium text-app-primary truncate group-hover/att:text-app-accent transition-colors">
+                              {att.name}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {!bug.task_id && (
+                      <button
+                        onClick={() => convertToTask(bug)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-500 text-white hover:bg-indigo-600 flex items-center gap-1"
+                      >
+                        <ArrowRight className="w-3 h-3" /> Göreve Dönüştür
+                      </button>
+                    )}
+                    <button onClick={() => deleteBug(bug.id)} className="p-1.5 text-app-muted hover:text-rose-500 transition-colors">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-app-surface w-full max-w-lg rounded-2xl border border-app shadow-2xl p-6" onDrop={handleDrop} onDragOver={e => e.preventDefault()}>
+            <h2 className="text-lg font-bold mb-4">Yeni Bug Bildir</h2>
+            <form onSubmit={handleAddBug} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-app-secondary mb-1">Başlık</label>
+                <input required value={title} onChange={(e) => setTitle(e.target.value)} className="w-full bg-app-bg border border-app rounded-xl px-3 py-2 text-sm outline-hidden focus:border-rose-500" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-app-secondary mb-1">Açıklama (Resim kopyala-yapıştır yapabilirsiniz)</label>
+                <textarea onPaste={handlePaste} value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className="w-full bg-app-bg border border-app rounded-xl px-3 py-2 text-sm outline-hidden focus:border-rose-500" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-app-secondary mb-1">Proje</label>
+                  <div className="flex items-center gap-2">
+                    {showNewProjectInput ? (
+                      <div className="flex-1 flex items-center gap-1">
+                        <input autoFocus value={newProjectName} onChange={e => setNewProjectName(e.target.value)} onKeyDown={e => { if(e.key==='Enter') { e.preventDefault(); handleAddNewProject(); } if(e.key==='Escape') setShowNewProjectInput(false); }} placeholder="Yeni proje adı" className="flex-1 bg-app-bg border border-app rounded-xl px-3 py-2 text-sm outline-hidden focus:border-rose-500" />
+                        <button type="button" onClick={handleAddNewProject} className="p-2 bg-emerald-500/10 text-emerald-500 rounded-xl hover:bg-emerald-500/20"><CheckCircle2 size={16} /></button>
+                        <button type="button" onClick={() => setShowNewProjectInput(false)} className="p-2 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500/20"><X size={16} /></button>
+                      </div>
+                    ) : (
+                      <select value={project} onChange={(e) => { if (e.target.value === 'add_new') setShowNewProjectInput(true); else setProject(e.target.value); }} className="flex-1 bg-app-bg border border-app rounded-xl px-3 py-2 text-sm outline-hidden focus:border-rose-500">
+                        {availableProjects.map(p => (
+                          <option key={p} value={p}>{p}</option>
+                        ))}
+                        <option value="add_new">+ Yeni Proje Ekle</option>
+                      </select>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-app-secondary mb-1">Önem Derecesi (Severity)</label>
+                  <select value={severity} onChange={(e) => setSeverity(e.target.value)} className="w-full bg-app-bg border border-app rounded-xl px-3 py-2 text-sm outline-hidden focus:border-rose-500">
+                    <option value="minor">Minor</option>
+                    <option value="major">Major</option>
+                    <option value="critical">Critical</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-app-secondary mb-1">Takvime Planla (Opsiyonel)</label>
+                  <input type="date" value={plannedDate} onChange={(e) => setPlannedDate(e.target.value)} className="w-full bg-app-bg border border-app rounded-xl px-3 py-2 text-sm outline-hidden focus:border-rose-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-app-secondary mb-1">Çevre (Environment)</label>
+                  <input type="text" value={environment} onChange={(e) => setEnvironment(e.target.value)} placeholder="Prod, Staging, Local..." className="w-full bg-app-bg border border-app rounded-xl px-3 py-2 text-sm outline-hidden focus:border-rose-500" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-app-secondary mb-1">Tekrar Adımları</label>
+                <textarea onPaste={handlePaste} value={reproductionSteps} onChange={(e) => setReproductionSteps(e.target.value)} rows={2} className="w-full bg-app-bg border border-app rounded-xl px-3 py-2 text-sm outline-hidden focus:border-rose-500" />
+              </div>
+
+              {/* Attachments / Images Preview inside Modal */}
+              {images.length > 0 && (
+                <div className="p-3 rounded-2xl bg-app-bg border border-app">
+                  <span className="text-[11px] font-semibold text-app-muted uppercase">Görseller</span>
+                  <ImageStrip images={images} onRemove={i => setImages(prev => prev.filter((_, idx) => idx !== i))} onOpen={setLightboxSrc} />
+                </div>
+              )}
+              {attachments.length > 0 && (
+                <div className="flex flex-col gap-1.5">
+                  {attachments.map((att, i) => (
+                    <div key={i} className="flex items-center gap-2 p-2 rounded-xl bg-app-bg border border-app">
+                      {att.type === 'folder' ? <Folder size={14} className="text-amber-500" /> : <File size={14} className="text-blue-500" />}
+                      <span className="text-xs font-medium text-app-primary truncate flex-1">{att.name}</span>
+                      <button type="button" onClick={() => setAttachments(prev => prev.filter((_, idx) => idx !== i))} className="text-app-muted hover:text-red-500">
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex items-center justify-between pt-4">
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => document.getElementById('bug-file-input').click()} className="p-2 rounded-xl border border-app bg-app-bg text-app-secondary hover:text-app-primary hover:border-app-accent flex items-center gap-1.5 transition-all text-xs font-medium" title="Resim Seç">
+                    <ImageIcon size={14} /> Resim Seç
+                    <input id="bug-file-input" type="file" accept="image/*" multiple className="hidden" onChange={e => handleImageFiles(e.target.files)} />
+                  </button>
+                  <button type="button" onClick={() => handleAddAttachment('file')} className="p-2 rounded-xl border border-app bg-app-bg text-app-secondary hover:text-app-primary hover:border-app-accent flex items-center transition-all text-xs font-medium" title="Dosya Ekle">
+                    <Paperclip size={14} />
+                  </button>
+                  <button type="button" onClick={() => handleAddAttachment('folder')} className="p-2 rounded-xl border border-app bg-app-bg text-app-secondary hover:text-app-primary hover:border-app-accent flex items-center transition-all text-xs font-medium" title="Klasör Ekle">
+                    <Folder size={14} />
+                  </button>
+                </div>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm font-semibold text-app-secondary hover:text-app-primary">İptal</button>
+                  <button type="submit" className="px-4 py-2 bg-rose-500 hover:bg-rose-600 text-white text-sm font-semibold rounded-xl">Kaydet</button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {lightboxSrc && <Lightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />}
+    </div>
+  );
+}

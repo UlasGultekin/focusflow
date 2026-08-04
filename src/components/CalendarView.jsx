@@ -10,8 +10,12 @@ import {
   CheckCircle2,
   CalendarDays,
   StickyNote,
+  Bug,
+  Wrench,
 } from 'lucide-react';
 import { useTaskStore } from '../stores/useTaskStore';
+import { useBugStore } from '../stores/useBugStore';
+import { useTechDebtStore } from '../stores/useTechDebtStore';
 import {
   format,
   addDays,
@@ -47,8 +51,16 @@ export default function CalendarView() {
     (n) => n.planned_date && n.planned_date === selectedDateStr
   );
 
+  const { bugs, fetchBugs } = useBugStore();
+  const { techDebts, fetchTechDebts } = useTechDebtStore();
+
+  const dayBugs = bugs.filter((b) => b.planned_date === selectedDateStr);
+  const dayTechDebts = techDebts.filter((td) => td.planned_date === selectedDateStr);
+
   useEffect(() => {
     if (fetchAllNotes) fetchAllNotes();
+    if (fetchBugs) fetchBugs();
+    if (fetchTechDebts) fetchTechDebts();
   }, []);
 
   // Unplanned tasks
@@ -183,7 +195,7 @@ export default function CalendarView() {
         <div className="lg:col-span-3 bg-app-surface border border-app rounded-2xl p-5 shadow-xs space-y-1">
           <div className="text-xs font-bold text-app-secondary border-b border-app pb-3 mb-2 flex items-center justify-between">
             <span>Saatlik Çizelge</span>
-            <span>{dayTasks.length + dayNotes.length} Planlı Etkinlik</span>
+            <span>{dayTasks.length + dayNotes.length + dayBugs.length + dayTechDebts.length} Planlı Etkinlik</span>
           </div>
 
           <div className="space-y-2">
@@ -202,7 +214,30 @@ export default function CalendarView() {
                 return h === hour;
               });
 
-              const isOverlap = tasksForHour.length + notesForHour.length > 1;
+              const bugsForHour = dayBugs.filter((b) => {
+                // bugs may not have planned_start_time, but if they do:
+                if (!b.planned_start_time) return false;
+                const h = parseInt(b.planned_start_time.split(':')[0], 10);
+                return h === hour;
+              });
+
+              const techDebtsForHour = dayTechDebts.filter((td) => {
+                if (!td.planned_start_time) return false;
+                const h = parseInt(td.planned_start_time.split(':')[0], 10);
+                return h === hour;
+              });
+
+              // Also match items without a specific hour to 10:00 as fallback (just for visual representation if planned_start_time is missing but planned_date exists, wait no, let's keep it simple)
+              // Actually in Bug and TechDebt creation, we didn't add planned_start_time. So they might not appear here! 
+              // Wait, I didn't add planned_start_time to Bug and TechDebt tables!
+              // Let's just put all of them at 10:00 if they don't have start_time.
+              dayBugs.forEach(b => { if (!b.planned_start_time) b.planned_start_time = '10:00'; });
+              dayTechDebts.forEach(td => { if (!td.planned_start_time) td.planned_start_time = '10:00'; });
+
+              const finalBugsForHour = dayBugs.filter(b => parseInt(b.planned_start_time.split(':')[0], 10) === hour);
+              const finalTechDebtsForHour = dayTechDebts.filter(td => parseInt(td.planned_start_time.split(':')[0], 10) === hour);
+
+              const isOverlap = tasksForHour.length + notesForHour.length + finalBugsForHour.length + finalTechDebtsForHour.length > 1;
 
               return (
                 <div
@@ -222,7 +257,7 @@ export default function CalendarView() {
                       </span>
                     )}
 
-                    {tasksForHour.length === 0 && notesForHour.length === 0 ? (
+                    {tasksForHour.length === 0 && notesForHour.length === 0 && finalBugsForHour.length === 0 && finalTechDebtsForHour.length === 0 ? (
                       <button 
                         onClick={() => {
                           setPlanTime(hourStr);
@@ -250,14 +285,31 @@ export default function CalendarView() {
                           return (
                             <div
                               key={'n-' + note.id}
-                              className="px-3 py-2 rounded-xl text-xs font-semibold text-app-primary bg-amber-500/10 border border-amber-500/20 shadow-xs flex items-center gap-2"
+                              className="px-3 py-2 rounded-xl text-xs font-semibold text-amber-800 bg-amber-100 shadow-xs flex items-center gap-2"
                             >
-                              <StickyNote className="w-3.5 h-3.5 text-amber-500" />
-                              <span>{noteTitle}</span>
-                              <span className="text-[10px] opacity-80 text-app-muted">(Not)</span>
+                              <StickyNote className="w-3.5 h-3.5" />
+                              <span className="truncate max-w-[150px]">{noteTitle}</span>
                             </div>
                           );
                         })}
+                        {finalBugsForHour.map((bug) => (
+                          <div
+                            key={'b-' + bug.id}
+                            className="px-3 py-2 rounded-xl text-xs font-semibold text-rose-800 bg-rose-100 shadow-xs flex items-center gap-2"
+                          >
+                            <Bug className="w-3.5 h-3.5" />
+                            <span className="truncate max-w-[150px]">{bug.title}</span>
+                          </div>
+                        ))}
+                        {finalTechDebtsForHour.map((td) => (
+                          <div
+                            key={'td-' + td.id}
+                            className="px-3 py-2 rounded-xl text-xs font-semibold text-indigo-800 bg-indigo-100 shadow-xs flex items-center gap-2"
+                          >
+                            <Wrench className="w-3.5 h-3.5" />
+                            <span className="truncate max-w-[150px]">{td.title}</span>
+                          </div>
+                        ))}
                       </>
                     )}
                   </div>

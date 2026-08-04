@@ -1,173 +1,127 @@
-İşte istediğin iki yeni özelliğin eksiksiz görev kartları. İkisi de mevcut veritabanı ve IPC yapısına sorunsuzca entegre olacak şekilde hazırlandı.
+Mevcut yapıyı tamamen koruyarak, istediğin ayrımı sağlayacak bir mimari güncellemesi öneriyorum. Temel prensip: **Bug, Teknik Borç, Snippet gibi varlıklar kendi tablolarında yaşar; görev ya da takvim öğesi olmaları isteğe bağlıdır.** Yani hiçbir şey otomatik olarak görev panosuna düşmez; yalnızca sen “Görev olarak ata” dediğinde göreve dönüşür.
 
 ---
 
-## Görev 19: Oturum Notları (Session Notes)
+## 🔄 Mimari Revizyon Özeti
 
-**Amaç:** Her pomodoro veya odaklanma oturumu sonunda, kullanıcının o seansta aklına gelen fikirleri hızlıca not almasını sağlamak. Notlar oturuma ve ilgili göreve bağlanır; sonradan görev detayında görüntülenebilir ve düzenlenebilir.
+| Varlık | Kendi Tablosu | Görev Olarak Atanabilir mi? | Takvime Eklenebilir mi? |
+|--------|---------------|----------------------------|--------------------------|
+| Görev | `tasks` | *(zaten görev)* | Evet, `planned_date` ile |
+| Teknik Borç | `tech_debts` | ✅ “Göreve Dönüştür” butonu | ✅ `planned_date` ile (kendi alanı) |
+| Bug | `bugs` | ✅ “Göreve Dönüştür” butonu | ✅ `planned_date` ile (kendi alanı) |
+| Kod Snippet | `code_snippets` | ❌ (görevle ilişkilendirilebilir) | ❌ |
+| Derin Çalışma Girişi | `deep_work_entries` | ❌ (göreve bağlı) | ❌ |
 
-### 19.1 Veritabanı Güncellemesi
-Mevcut `task_sessions` tablosuna yeni bir sütun eklenir:
-
-```sql
-ALTER TABLE task_sessions ADD COLUMN notes TEXT DEFAULT '';
-```
-
-Bu sütun, oturum tamamlandığında veya duraklatıldığında alınan kısa notu saklar. Eğer ileride daha uzun notlar veya Markdown desteği istenirse `TEXT` yeterlidir.
-
-### 19.2 IPC Metodları
-- `updateSessionNotes(sessionId, notes)`: Belirtilen oturumun notlarını günceller, güncellenmiş satırı döndürür.
-- `getSessionNotes(sessionId)`: Oturuma ait notu döndürür. (Genellikle görev detayı oturum listesini çekerken zaten `task_sessions` satırları geldiği için bu metod opsiyoneldir.)
-
-### 19.3 Arayüz Gereksinimleri
-
-#### 19.3.1 Oturum Bitiş Mini Modalı
-- Pomodoro veya odaklanma oturumu herhangi bir şekilde sona erdiğinde (süre doldu, kullanıcı manuel durdurdu veya duraklattı), ekranın sağ alt köşesinde **küçük, çerçevesiz bir modal** belirir.
-- Modal boyutu yaklaşık 400x250px, temaya uygun yarı saydam arka plan ve hafif gölge.
-- İçerik:
-  - Başlık: “Oturum tamamlandı – [Görev Adı]” (eğer görev bağlıysa) veya “Odaklanma oturumu tamamlandı” (genel sayaç).
-  - Metin alanı: placeholder “Bu seansta aklına gelen fikirler, notlar…”. 3-4 satır yükseklikte, otomatik odaklanmış.
-  - Alt kısımda iki buton:
-    - “Kaydet ve Kapat” – notu veritabanına kaydeder, modalı kapatır.
-    - “Şimdilik Geç” – not kaydedilmeden modal kapanır. Bu durumda not alanı boş kalır.
-- Modal 15 saniye içinde herhangi bir etkileşim olmazsa otomatik olarak kapanır, içerik kaydedilmez.
-- Eğer oturum bir göreve bağlıysa ve kullanıcı not girip kaydederse, görev detayındaki oturum listesinde bu not anında görünür hale gelir.
-
-#### 19.3.2 Görev Detayında Oturum Notlarının Gösterimi
-- Görev detayının “Oturumlar” bölümünde (Görev 4’te oluşturulan kronolojik liste), her oturum satırının altında veya yanında küçük bir not simgesi (📝) görünür.
-- Not simgesine tıklandığında, satır genişler ve not içeriği okunabilir. Tekrar tıklayınca daralır (akordeon mantığı).
-- Not içeriği varsa simge dolgu, yoksa çizgi olur.
-- Not düzenleme: Genişletilmiş not alanına tıklanınca metin düzenlenebilir hale gelir. Değişiklikler anında `updateSessionNotes` IPC’si ile kaydedilir.
-
-#### 19.3.3 Oturum Notlarının Analiz ve Arama ile Entegrasyonu
-- Görev 20 (Gelişmiş Arama) ile birlikte, oturum notları da arama kapsamına alınır.
-- Analiz sayfasında oturum notlarının kelime sayısı veya not bırakılan oturum oranı gibi metrikler isteğe bağlı olarak gösterilebilir, ama şimdilik zorunlu değil.
-
-### 19.4 Tasarım Detayları
-- Mini modal, temanın rengine uygun: Soft Light’ta beyaz arka plan, hafif mavi gölge; Deep Dark’ta koyu arka plan, mor kenar çizgisi; Pastel Calm’da açık yeşil arka plan.
-- Metin alanı, temanın yazı rengi ve arka planıyla uyumlu, çerçevesiz.
-- Butonlar sade, yuvarlak köşeli. Kaydet butonu temanın vurgu renginde dolgulu, “Geç” butonu metin şeklinde veya ince çerçeveli.
-
-### 19.5 Test Adımları
-1. Bir göreve pomodoro başlat, sürenin bitmesini bekle veya manuel durdur.
-2. Mini modalın açıldığını doğrula.
-3. Not girip kaydet, görev detayına git ve oturum satırında not simgesinin dolduğunu gör.
-4. Simgeye tıkla, notun okunduğundan ve düzenlenebildiğinden emin ol.
-5. Boş bırakıp “Geç” dediğinde simgenin boş olduğunu kontrol et.
-6. Modalı 15 saniye bekleyerek otomatik kapanmayı test et.
+- **Görevler** hâlâ `tasks` tablosunda. Board, Todo/In Progress/Done yalnızca `tasks` üzerinde çalışır.
+- **Bug ve Teknik Borç** kendi özel tablolarında tutulur. Onları yönettiğin ayrı paneller vardır (Dashboard widget’ları veya özel sayfalar).
+- Bir Bug veya Teknik Borcu **“Göreve Dönüştür”** dediğinde, `tasks` tablosuna bir kopya oluşturulur ve aralarında bağlantı (`task_id` referansı) kurulur. Böylece board’a düşer.
+- Takvim yalnızca `planned_date` içeren kayıtları gösterir. Bug ve Teknik Borç tablolarına da `planned_date` eklenir, böylece onları isteğe bağlı takvime yerleştirebilirsin.
 
 ---
 
-## Görev 20: Gelişmiş Arama & Filtreleme
+## Görev 27: Merkezi Olmayan Varlık Yönetimi ve İsteğe Bağlı Bağlama
 
-**Amaç:** Sadece görev başlıklarında değil; tüm görevler, alt görevler, görev notları, genel notlar, günlük girişleri, oturum notları ve bağlı dosya adları üzerinde güçlü bir tam metin araması yapmak. Arama sonuçlarını kategori, durum, tarih aralığı gibi filtrelerle daraltabilmek.
+**Amaç:** Teknik Borç, Bug, Snippet gibi özel varlıkların görevlerden bağımsız olarak kendi tablolarında yönetilmesi; yalnızca kullanıcı istediğinde göreve dönüştürülmesi veya takvime eklenmesi.
 
-### 20.1 Veritabanı Güncellemesi: FTS5 Sanal Tablo
-SQLite’ın hızlı tam metin arama motoru FTS5 kullanılır. Aranabilir içerikleri tek bir sanal tabloda toplamak için aşağıdaki yapı oluşturulur:
+### 27.1 Veritabanı Revizyonu
+
+Aşağıdaki tablolar **Görev 21 ve 23’ün yerine geçecek** şekilde oluşturulur:
 
 ```sql
-CREATE VIRTUAL TABLE IF NOT EXISTS search_index USING fts5(
-  source_type,      -- 'task', 'subtask', 'task_note', 'general_note', 'journal', 'session_note', 'attachment'
-  source_id,        -- ilgili tablodaki kayıt ID'si
-  title,            -- görev başlığı, alt görev başlığı, not başlığı (varsa), günlük tarihi vb.
-  content,          -- ana metin: görev açıklaması, alt görev başlığı, not içeriği, günlük içeriği, oturum notu, dosya adı
-  task_id,          -- eğer bir göreve bağlıysa task_id (filtreleme ve bağlantı için)
-  date_info,        -- YYYY-MM-DD formatında ilişkili tarih (görev oluşturma, not tarihi, günlük tarihi, oturum başlangıcı)
-  status,           -- görev durumu (todo/in_progress/done), diğerleri için boş olabilir
-  extra_json        -- opsiyonel ek bilgiler (JSON)
+-- Teknik Borçlar (tasks'tan bağımsız)
+CREATE TABLE IF NOT EXISTS tech_debts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  description TEXT,
+  category TEXT DEFAULT 'refactor',  -- refactor, performance, security, cleanup, documentation
+  estimated_minutes INTEGER,
+  status TEXT DEFAULT 'open',        -- open, in_progress, resolved, archived
+  priority TEXT DEFAULT 'medium',    -- low, medium, high, critical
+  planned_date TEXT,                 -- isteğe bağlı takvim planlaması
+  task_id INTEGER,                   -- dönüştürüldüğünde bağlanacak görev ID'si
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL
+);
+
+-- Bug'lar (tasks'tan bağımsız)
+CREATE TABLE IF NOT EXISTS bugs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  description TEXT,
+  severity TEXT DEFAULT 'minor',     -- critical, major, minor, trivial
+  reproduction_steps TEXT,
+  environment TEXT,
+  status TEXT DEFAULT 'open',        -- open, in_progress, resolved, closed
+  priority TEXT DEFAULT 'medium',
+  planned_date TEXT,                 -- isteğe bağlı takvim planlaması
+  fix_commit TEXT,
+  task_id INTEGER,                   -- dönüştürüldüğünde bağlanacak görev ID'si
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL
 );
 ```
 
-**İlk doldurma ve güncelleme stratejisi:**
-- Uygulama başlangıcında FTS tablosu yoksa oluşturulur ve mevcut tüm veriler indekslenir.
-- Her ekleme/güncelleme/silme işleminde ilgili kayıt `search_index` tablosunda da güncellenir (trigger veya uygulama kodu ile). Basitlik için uygulama seviyesinde, ilgili IPC metotlarının içinde senkronizasyon tercih edilebilir.
-- Arama yaparken kaynak türü ve ID kullanılarak orijinal kayda bağlantı kurulur.
+**Not:** `code_snippets` ve `deep_work_entries` tabloları aynen kalır, onlar zaten görevle ilişkilendirilebilir yapıdadır.
 
-İndeksleme fonksiyonu (ana süreç):
-- `rebuildSearchIndex()`: Tüm tabloları tarar, FTS tablosunu temizler ve yeniden doldurur. İsteğe bağlı olarak ayarlardan manuel tetiklenebilir.
+### 27.2 IPC Metodları (Yeni ve Güncellenen)
 
-### 20.2 IPC Metodları
-- `searchAll(query, filters?)`: `query` FTS5 sorgusu olarak `search_index` üzerinde çalıştırılır. `filters` nesnesi opsiyonel olarak şunları içerebilir:
-  - `sourceTypes`: string[] (ör. ['task', 'journal'])
-  - `taskStatus`: string (todo/in_progress/done)
-  - `dateFrom`, `dateTo`: YYYY-MM-DD
-  - `taskId`: belirli bir göreve bağlı sonuçlar için.
-- `getSearchSuggestions(partialQuery)`: `search_index` üzerinde `LIKE` veya FTS5 prefix sorgusu ile otomatik tamamlama önerileri döndürür (en fazla 5-10 sonuç). Başlık ve içerikten kısa parçacıklar.
-- `rebuildSearchIndex()`: Manuel indeks yenileme.
+**Teknik Borç:**
+- `addTechDebt(data)` → Yeni borç ekler.
+- `updateTechDebt(id, data)` → Günceller.
+- `deleteTechDebt(id)` → Siler.
+- `convertTechDebtToTask(techDebtId)` → **Göreve dönüştürme**:
+  - `tech_debts` kaydını okur.
+  - `tasks` tablosuna yeni bir görev ekler (`task_type: 'tech_debt'`, başlık, açıklama, tahmini süre vb. kopyalanır).
+  - `tech_debts` kaydının `task_id` alanını yeni görevin ID’si ile günceller.
+  - Oluşan görev ID’sini döndürür.
+- `getTechDebts(filters?)` → Liste. Filtreler: status, category, priority, planned_date aralığı.
 
-Dönen sonuç yapısı:
-```json
-{
-  "source_type": "task",
-  "source_id": 123,
-  "title": "Blog yazısını düzelt",
-  "snippet": "...taslağı gözden geçir ve <mark>düzelt</mark>...",
-  "date_info": "2026-08-04",
-  "status": "in_progress",
-  "task_id": 123
-}
-```
-`snippet`, FTS5’in `snippet()` fonksiyonu ile eşleşen kelimenin etrafından alınan kısa metindir (HTML `<mark>` etiketleriyle vurgulanmış).
+**Bug:**
+- `addBug(data)`, `updateBug(id, data)`, `deleteBug(id)`.
+- `convertBugToTask(bugId)` → Yukarıdakiyle aynı mantık, `task_type: 'bug'`.
+- `getBugs(filters?)`.
 
-### 20.3 Arayüz Gereksinimleri
+**Takvim Entegrasyonu için Ortak Metot:**
+- `getCalendarItems(startDate, endDate)` → Birleştirilmiş liste döndürür:
+  - `tasks` tablosundan `planned_date` dolu olan ve verilen aralıktaki görevler.
+  - `tech_debts` tablosundan `planned_date` dolu kayıtlar.
+  - `bugs` tablosundan `planned_date` dolu kayıtlar.
+  - Her kayıt `{ type: 'task'|'tech_debt'|'bug', id, title, planned_date, planned_start_time, color, status }` formatında.
 
-#### 20.3.1 Arama Girişi ve Komut Paleti
-- Uygulamanın her yerinden erişilebilen global bir kısayol: `Ctrl + Shift + F` (veya `Ctrl + P` komut paleti olarak).
-- Kısayola basıldığında ekranın ortasında büyük bir **Arama Paleti** açılır.
-- Palet yapısı:
-  - En üstte geniş bir arama inputu, otomatik odaklanmış.
-  - Inputa yazarken 300ms debounce ile `getSearchSuggestions` çağrılır ve inputun altında canlı öneriler listelenir (dropdown).
-  - Enter’a basınca veya “Tüm sonuçları gör” seçeneğine tıklanınca tam sonuç sayfasına yönlendirir.
-- Palette basit filtre butonları: “Görevler”, “Notlar”, “Günlük”, “Dosyalar” gibi chip butonlar, tıklandıkça filtre eklenir/çıkarılır.
+### 27.3 Görev ve Board Entegrasyonu
 
-#### 20.3.2 Arama Sonuçları Sayfası
-- Tam ekran bir sayfa. Sol üstte arama kutusu (mevcut sorguyu gösterir, düzenlenebilir). Yanında filtre butonları.
-- Filtre paneli (isteğe bağlı açılır/kapanır):
-  - Kaynak türü checkbox’ları: Görevler, Alt Görevler, Görev Notları, Genel Notlar, Günlük Girişleri, Oturum Notları, Dosyalar.
-  - Görev durumu: Tümü, Yapılacak, Devam Eden, Tamamlanan (sadece görev kaynakları için aktif).
-  - Tarih aralığı: Başlangıç ve bitiş tarihi seçicileri.
-- Sonuç listesi, kaynak türüne göre gruplandırılır:
-  - Her grup başlığı: “Görevler (5)”, “Günlük Girişleri (2)” vb.
-  - Her sonuç kartı şunları içerir:
-    - Kaynak türü ikonu (📋 görev, 📝 not, 📔 günlük, ⏱️ oturum notu, 📎 dosya)
-    - Başlık (kalın)
-    - Vurgulanmış snippet (HTML render edilmiş, arama terimi sarı fosforlu işaretli)
-    - Tarih ve varsa durum etiketi
-    - Tıklanabilir alan: ilgili sayfaya/görev detayına/günlük gününe yönlendirir.
-- Sonuç bulunamazsa temaya uygun boş durum illüstrasyonu ve “Aramanızla eşleşen sonuç bulunamadı” mesajı.
+- **Board** (Görev 12) yalnızca `tasks` tablosundaki kayıtları gösterir. `task_type` bilgisine göre görsel farklılık (bug → kırmızı ikon, tech_debt → turuncu) korunur.
+- **Yeni görev oluşturma** modalinde sadece “Görev” ve “Etkinlik” seçenekleri olur. Bug veya Teknik Borç eklemek isteyen kullanıcı, Dashboard’daki ilgili widget üzerinden veya ana menüdeki “Bug’lar” / “Teknik Borçlar” sayfasından ekler.
+- Bir Bug veya Teknik Borcu göreve dönüştürme: İlgili panelde her kaydın yanında **“Göreve Dönüştür”** butonu bulunur. Tıklandığında, oluşan görev Board’a düşer.
 
-#### 20.3.3 Entegrasyon ve Yönlendirme
-- Görev sonucuna tıklayınca o görevin detay sayfasına gidilir (veya board’da ilgili kart vurgulanır).
-- Günlük girişi sonucuna tıklayınca Günlük sekmesinde o tarihe gidilir.
-- Genel not sonucuna tıklayınca Genel Notlar sayfasında o not açılır.
-- Oturum notu sonucuna tıklayınca ilgili görevin detayındaki oturumlar bölümüne ve o oturuma scroll yapılır.
-- Dosya sonucuna tıklayınca dosya sistemde açılır (`shell.openPath`).
+### 27.4 Takvim Entegrasyonu
 
-### 20.4 Zustand Store
-`useSearchStore`:
-- `query`, `filters`, `results`, `isSearching`, `suggestions`.
-- `search(query, filters)` → IPC çağrısı, sonuçları store’a yazar.
-- `updateFilters(filters)`.
-- `clearSearch()`.
+- Takvim (Görev 13) `getCalendarItems` metodunu kullanır.
+- Bir Bug veya Teknik Borcu takvimde göstermek için: İlgili varlığın detayında bir **“Takvime Ekle”** butonu bulunur. Tıklandığında `planned_date` alanı seçilir (mini bir tarih/saat seçici ile). Bu alan doldurulduğu anda takvimde görünür.
+- Takvimden kaldırmak için `planned_date` null yapılır.
 
-### 20.5 Performans Optimizasyonu
-- FTS5 kullanımı milyonlarca kayıtta bile çok hızlıdır; masaüstü uygulaması için fazlasıyla yeterlidir.
-- Arama debounce ile yapılır (300ms).
-- Sonuçlar sanal liste (react-window veya react-virtuoso) ile render edilebilir, ancak şimdilik sonuç sayısı genelde düşük olacağından basit liste yeterlidir.
+### 27.5 Dashboard Güncellemesi
 
-### 20.6 Tasarım Detayları
-- Arama paleti: Büyük, ortalanmış, yarı saydam koyu overlay. Input alanı büyük font, yuvarlak köşe, gölge.
-- Sonuç sayfası: Sol kenarda filtre paneli, ana alan temiz liste. Snippet’te vurgu rengi temanın vurgu rengi olabilir.
-- Boş durum: Sade ve motive edici ikon.
+Widget’lar güncellenir:
+- **“Açık Bug’lar”** widget’ı doğrudan `bugs` tablosundan okur.
+- **“Teknik Borç Özeti”** widget’ı doğrudan `tech_debts` tablosundan okur.
+- İsteğe bağlı olarak her iki widget’ta da “Yeni Ekle” butonu bulunur.
 
-### 20.7 Test Adımları
-1. Bir görev, bir alt görev, bir günlük girişi ve bir göreve bağlı oturum notu oluştur.
-2. `Ctrl+Shift+F` ile arama paletini aç, anahtar kelime yaz. Önerilerin çıktığını gör.
-3. Enter ile sonuç sayfasına git. Filtreleri değiştir: sadece günlük, sadece görevler vb. Sonuçların doğru filtrelendiğini kontrol et.
-4. Sonuçlara tıklayarak doğru sayfalara yönlendirildiğini doğrula.
-5. İndeksi yeniden oluşturma butonunu test et.
-6. Hiç sonuç olmayan bir sorgu yap, boş durum ekranını gör.
+### 27.6 Eski Yapıdan Geçiş (Migrasyon)
+
+- Daha önce `tasks` tablosuna `task_type` olarak `bug` veya `tech_debt` eklenmiş olabilir. Bunlar için bir kerelik migrasyon script’i çalıştırılır: `task_type = 'bug'` olanlar `bugs` tablosuna, `'tech_debt'` olanlar `tech_debts` tablosuna kopyalanır ve `task_id` ile bağlanır. Ardından `tasks` tablosundaki `task_type` değerleri `'task'` olarak güncellenir (opsiyonel). Bu sayede veri kaybı olmaz.
 
 ---
 
-Bu iki görev, FocusFlow’un hem **anı yakalama** hem de **veriyi keşfetme** yeteneklerini radikal biçimde artıracak. Görev 19 tamamlandığında hiçbir parlak fikrin kaybolmayacak; Görev 20 tamamlandığında aradığın her şeye saniyeler içinde ulaşacaksın. Bir sonraki isteğini bekliyorum! 🚀
+## Sonuç
+
+Bu yapı ile:
+- **Görev Panosu** sadece gerçek görevleri gösterir.
+- **Bug ve Teknik Borç** kendi özel yönetim alanlarında takip edilir.
+- **“Göreve Dönüştür”** ile istediğin zaman board’a taşırsın.
+- **“Takvime Ekle”** ile istediğin varlığı takvimde planlarsın.
+- **Dashboard** tüm bu ayrık varlıkları tek bir görünümde toplar.
+
+Bu tasarım, uygulamanın modülerliğini ve netliğini korurken sana tam kontrol sağlar. Dilersen bu mimariye uygun şekilde Görev 27’yi daha detaylı (arayüz bileşenleri, store yapısı vs.) açabilirim. Onay verirsen devam edelim! 🚀
