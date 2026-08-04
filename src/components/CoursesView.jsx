@@ -117,10 +117,10 @@ export default function CoursesView() {
             onChange={(e) => setCategoryFilter(e.target.value)}
             className="px-3 py-1.5 rounded-xl border border-app bg-app-surface text-app-primary text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-app-accent cursor-pointer min-w-[160px]"
           >
-            <option value="all">🗂 Tümü ({courses.length} kurs)</option>
+            <option value="all">🗂 Tümü ({courses.length})</option>
             {categories.filter((c) => c !== 'all').map((cat) => (
               <option key={cat} value={cat}>
-                {cat} ({courses.filter((c) => c.category === cat).length} kurs)
+                {cat} ({courses.filter((c) => c.category === cat).length})
               </option>
             ))}
           </select>
