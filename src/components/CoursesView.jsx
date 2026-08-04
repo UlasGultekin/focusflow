@@ -31,10 +31,19 @@ export default function CoursesView() {
   const [title, setTitle] = useState('');
   const [url, setUrl] = useState('');
   const [category, setCategory] = useState('Yazılım');
+  const [categoryFilter, setCategoryFilter] = useState('all');
 
   useEffect(() => {
     fetchCourses();
   }, []);
+
+  // Unique categories from existing courses
+  const categories = ['all', ...new Set(courses.map((c) => c.category).filter(Boolean))];
+
+  // Filtered courses
+  const filteredCourses = categoryFilter === 'all'
+    ? courses
+    : courses.filter((c) => c.category === categoryFilter);
 
   // Format seconds to MM:SS or HH:MM:SS
   const formatElapsed = (totalSec) => {
@@ -99,9 +108,28 @@ export default function CoursesView() {
         </button>
       </div>
 
+      {/* Category Filter Tabs */}
+      {categories.length > 1 && (
+        <div className="px-6 py-3 border-b border-app bg-app-primary flex items-center gap-2 overflow-x-auto">
+          {categories.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setCategoryFilter(cat)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
+                categoryFilter === cat
+                  ? 'bg-app-accent text-white shadow-xs'
+                  : 'bg-app-secondary text-app-secondary hover:text-app-primary hover:bg-app-surface'
+              }`}
+            >
+              {cat === 'all' ? 'Tümü' : cat}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Course Cards Grid */}
       <div className="p-6 space-y-4 max-w-5xl">
-        {courses.length === 0 ? (
+        {filteredCourses.length === 0 ? (
           <div className="bg-app-surface border border-app rounded-2xl p-12 text-center space-y-3">
             <BookOpen className="w-12 h-12 text-indigo-500 mx-auto animate-pulse" />
             <h3 className="font-bold text-base text-app-primary">Henüz Eğitim Eklenmedi</h3>
@@ -110,7 +138,7 @@ export default function CoursesView() {
             </p>
           </div>
         ) : (
-          courses.map((course) => {
+          filteredCourses.map((course) => {
             const isSessionActive =
               activeCourseSession && activeCourseSession.course_id === course.id;
 

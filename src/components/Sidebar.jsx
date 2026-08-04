@@ -1,57 +1,154 @@
-import React from 'react';
-import { LayoutList, Kanban, Calendar, GraduationCap, Flame, BookHeart, NotebookPen, BarChart3, Search, Settings, Sparkles, Moon, Sun } from 'lucide-react';
-import { useSettingsStore } from '../stores/useSettingsStore';
+import React, { useState } from 'react';
+import {
+  LayoutList, Kanban, Calendar, GraduationCap, Flame, BookHeart,
+  NotebookPen, BarChart3, Search, Settings, Sparkles, Moon, Sun,
+  Pencil, Check, X, RotateCcw,
+} from 'lucide-react';
+import { useSettingsStore, DEFAULT_MENU_LABELS } from '../stores/useSettingsStore';
 
 export default function Sidebar({ currentTab, setCurrentTab }) {
-  const { theme, setTheme, compactMode } = useSettingsStore();
+  const { theme, setTheme, compactMode, menuLabels, setMenuLabel, resetMenuLabels } = useSettingsStore();
+
+  const [editingId, setEditingId] = useState(null);
+  const [editingValue, setEditingValue] = useState('');
+  const [isEditMode, setIsEditMode] = useState(false);
 
   const menuItems = [
-    { id: 'tasks', label: 'Görevler', icon: LayoutList },
-    { id: 'board', label: 'Pano (Kanban)', icon: Kanban },
-    { id: 'calendar', label: 'Takvim', icon: Calendar },
-    { id: 'courses', label: 'Eğitimler', icon: GraduationCap },
-    { id: 'habits', label: 'Alışkanlıklar', icon: Flame },
-    { id: 'journal', label: 'Günlük (Journal)', icon: BookHeart },
-    { id: 'notes', label: 'Not Defteri', icon: NotebookPen },
-    { id: 'search', label: 'Gelişmiş Arama', icon: Search },
-    { id: 'analytics', label: 'Analiz & Raporlar', icon: BarChart3 },
-    { id: 'settings', label: 'Ayarlar', icon: Settings },
+    { id: 'tasks', icon: LayoutList },
+    { id: 'board', icon: Kanban },
+    { id: 'calendar', icon: Calendar },
+    { id: 'courses', icon: GraduationCap },
+    { id: 'habits', icon: Flame },
+    { id: 'journal', icon: BookHeart },
+    { id: 'notes', icon: NotebookPen },
+    { id: 'search', icon: Search },
+    { id: 'analytics', icon: BarChart3 },
+    { id: 'settings', icon: Settings },
   ];
+
+  const handleStartEdit = (id, currentLabel) => {
+    setEditingId(id);
+    setEditingValue(currentLabel);
+  };
+
+  const handleSaveEdit = () => {
+    if (editingId) {
+      setMenuLabel(editingId, editingValue.trim() || DEFAULT_MENU_LABELS[editingId]);
+    }
+    setEditingId(null);
+    setEditingValue('');
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setEditingValue('');
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') handleSaveEdit();
+    if (e.key === 'Escape') handleCancelEdit();
+  };
 
   return (
     <aside className={`flex flex-col border-r border-app bg-app-surface transition-all duration-200 ${compactMode ? 'w-16' : 'w-60'} h-screen select-none`}>
       {/* Brand Header */}
       <div className="flex items-center gap-3 p-4 border-b border-app">
-        <div className="w-9 h-9 rounded-xl bg-app-accent flex items-center justify-center text-white shadow-md">
+        <div className="w-9 h-9 rounded-xl bg-app-accent flex items-center justify-center text-white shadow-md shrink-0">
           <Sparkles className="w-5 h-5" />
         </div>
         {!compactMode && (
-          <div>
+          <div className="flex-1 min-w-0">
             <h1 className="font-bold text-lg leading-none text-app-primary">FocusFlow</h1>
             <span className="text-xs text-app-muted font-medium">Masaüstü Odaklık</span>
           </div>
         )}
       </div>
 
+      {/* Edit Mode Toggle */}
+      {!compactMode && (
+        <div className="px-3 pt-2">
+          <button
+            onClick={() => {
+              setIsEditMode((v) => !v);
+              setEditingId(null);
+            }}
+            className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              isEditMode
+                ? 'bg-app-accent/10 text-app-accent border border-app-accent/30'
+                : 'text-app-muted hover:text-app-primary hover:bg-app-secondary'
+            }`}
+          >
+            <Pencil className="w-3.5 h-3.5" />
+            {isEditMode ? 'Düzenleme Modunu Kapat' : 'Sekme İsimlerini Düzenle'}
+          </button>
+
+          {isEditMode && (
+            <button
+              onClick={() => { resetMenuLabels(); setEditingId(null); }}
+              className="w-full flex items-center gap-2 px-2 py-1 rounded-lg text-xs text-app-muted hover:text-rose-500 transition-all mt-1"
+            >
+              <RotateCcw className="w-3 h-3" />
+              Varsayılana Sıfırla
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Navigation Items */}
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
         {menuItems.map((item) => {
           const Icon = item.icon;
           const isActive = currentTab === item.id;
+          const label = menuLabels[item.id] || DEFAULT_MENU_LABELS[item.id];
+          const isEditing = editingId === item.id;
+
           return (
-            <button
-              key={item.id}
-              onClick={() => setCurrentTab(item.id)}
-              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all duration-150 ${
-                isActive
-                  ? 'bg-app-accent text-white shadow-sm'
-                  : 'text-app-secondary hover:bg-app-surface-hover hover:text-app-primary'
-              }`}
-              title={compactMode ? item.label : undefined}
-            >
-              <Icon className="w-5 h-5 shrink-0" />
-              {!compactMode && <span>{item.label}</span>}
-            </button>
+            <div key={item.id} className="relative group/item">
+              {isEditing ? (
+                /* Inline Edit Input */
+                <div className="flex items-center gap-1 px-2 py-1.5">
+                  <Icon className="w-5 h-5 shrink-0 text-app-accent" />
+                  <input
+                    autoFocus
+                    value={editingValue}
+                    onChange={(e) => setEditingValue(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    className="flex-1 min-w-0 px-2 py-0.5 text-xs rounded-lg border border-app-accent bg-app-primary text-app-primary focus:outline-none"
+                    placeholder={DEFAULT_MENU_LABELS[item.id]}
+                  />
+                  <button onClick={handleSaveEdit} className="text-emerald-500 hover:text-emerald-600 p-0.5">
+                    <Check className="w-3.5 h-3.5" />
+                  </button>
+                  <button onClick={handleCancelEdit} className="text-rose-400 hover:text-rose-600 p-0.5">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => !isEditMode && setCurrentTab(item.id)}
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all duration-150 ${
+                    isActive && !isEditMode
+                      ? 'bg-app-accent text-white shadow-sm'
+                      : isEditMode
+                      ? 'text-app-secondary hover:bg-app-surface-hover cursor-default'
+                      : 'text-app-secondary hover:bg-app-surface-hover hover:text-app-primary'
+                  }`}
+                  title={compactMode ? label : undefined}
+                >
+                  <Icon className="w-5 h-5 shrink-0" />
+                  {!compactMode && <span className="flex-1 text-left truncate">{label}</span>}
+                  {/* Edit pen icon on hover in edit mode */}
+                  {isEditMode && !compactMode && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleStartEdit(item.id, label); }}
+                      className="opacity-0 group-hover/item:opacity-100 p-1 rounded-md hover:bg-app-accent/10 text-app-accent transition-all"
+                    >
+                      <Pencil className="w-3 h-3" />
+                    </button>
+                  )}
+                </button>
+              )}
+            </div>
           );
         })}
       </nav>

@@ -1,5 +1,28 @@
 import { create } from 'zustand';
 
+const DEFAULT_MENU_LABELS = {
+  tasks: 'Görevler',
+  board: 'Pano (Kanban)',
+  calendar: 'Takvim',
+  courses: 'Eğitimler',
+  habits: 'Alışkanlıklar',
+  journal: 'Günlük (Journal)',
+  notes: 'Not Defteri',
+  search: 'Gelişmiş Arama',
+  analytics: 'Analiz & Raporlar',
+  settings: 'Ayarlar',
+};
+
+function loadMenuLabels() {
+  try {
+    const saved = localStorage.getItem('focusflow_menu_labels');
+    if (saved) return { ...DEFAULT_MENU_LABELS, ...JSON.parse(saved) };
+  } catch (_) {}
+  return { ...DEFAULT_MENU_LABELS };
+}
+
+export { DEFAULT_MENU_LABELS };
+
 export const useSettingsStore = create((set, get) => ({
   theme: 'light', // light, dark, pastel
   compactMode: false,
@@ -10,6 +33,7 @@ export const useSettingsStore = create((set, get) => ({
     long_break: 15,
     long_break_interval: 4,
   },
+  menuLabels: loadMenuLabels(),
   isLoading: false,
 
   fetchSettings: async () => {
@@ -67,5 +91,22 @@ export const useSettingsStore = create((set, get) => ({
     if (window.electronAPI) {
       await window.electronAPI.updateSettings({ hotkeys });
     }
+  },
+
+  setMenuLabel: (tabId, label) => {
+    const current = get().menuLabels;
+    const updated = { ...current, [tabId]: label || DEFAULT_MENU_LABELS[tabId] };
+    set({ menuLabels: updated });
+    try {
+      localStorage.setItem('focusflow_menu_labels', JSON.stringify(updated));
+    } catch (_) {}
+  },
+
+  resetMenuLabels: () => {
+    const reset = { ...DEFAULT_MENU_LABELS };
+    set({ menuLabels: reset });
+    try {
+      localStorage.removeItem('focusflow_menu_labels');
+    } catch (_) {}
   },
 }));
