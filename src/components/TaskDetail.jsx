@@ -55,6 +55,8 @@ export default function TaskDetail({ onEditTask, onShareTask }) {
   const [quickNoteImages, setQuickNoteImages] = useState([]);
   const [quickNoteAttachments, setQuickNoteAttachments] = useState([]);
 
+  const [showNoteToast, setShowNoteToast] = useState(false);
+
   const [showNewNoteCatInput, setShowNewNoteCatInput] = useState(false);
   const [newNoteCatName, setNewNoteCatName] = useState('');
 
@@ -356,11 +358,66 @@ export default function TaskDetail({ onEditTask, onShareTask }) {
         <div className="flex items-center gap-2">
           <button
             onClick={() => {
-              setQuickNoteContent(`📌 ${task.title}\n\n`);
+              // 1. Template Generation
+              let template = `📌 Görev Özet Notu: ${task.title}\n\n`;
+              
+              if (task.description) {
+                template += `📝 Açıklama:\n${task.description}\n\n`;
+              }
+
+              // Alt Görevler (Subtasks)
+              if (subtasks && subtasks.length > 0) {
+                template += `☑️ Alt Görevler (Kontrol Listesi):\n`;
+                subtasks.forEach((st) => {
+                  template += `${st.completed ? '  [x]' : '  [ ]'} ${st.title}\n`;
+                });
+                template += `\n`;
+              }
+
+              // Düşünce Akışı (Deep Work Entries)
+              if (deepWorkEntries && deepWorkEntries.length > 0) {
+                template += `💡 Düşünce Akışı & Notlar:\n`;
+                deepWorkEntries.forEach((dw) => {
+                  template += `- ${dw.content}\n`;
+                });
+                template += `\n`;
+              }
+
+              // Bağlantılı Görevler (Task Links)
+              const hasBlockingMe = links.blockingMe && links.blockingMe.length > 0;
+              const hasBlockedByMe = links.blockedByMe && links.blockedByMe.length > 0;
+
+              if (hasBlockingMe || hasBlockedByMe) {
+                template += `🔗 Bağlantılı Görevler:\n`;
+                if (hasBlockingMe) {
+                  links.blockingMe.forEach((l) => {
+                    template += `- 🔒 Ön Koşul Görev: #${l.source_task_id} ${l.source_title} [${l.source_status}]\n`;
+                  });
+                }
+                if (hasBlockedByMe) {
+                  links.blockedByMe.forEach((l) => {
+                    template += `- 🚫 Engellenen Görev: #${l.target_task_id} ${l.target_title} [${l.target_status}]\n`;
+                  });
+                }
+                template += `\n`;
+              }
+
+              template += `✏️ Notlar & Özel Detaylar:\n`;
+
+              // 2. Pre-populate Task Attachments into Quick Note Attachments
+              const taskAttsFormatted = (attachments || []).map((att) => ({
+                name: att.name,
+                path: att.path,
+                type: att.type || 'file',
+              }));
+
+              setQuickNoteContent(template);
+              setQuickNoteAttachments(taskAttsFormatted);
+              setQuickNoteImages([]);
               setIsQuickNoteOpen(true);
             }}
             className="px-3 py-2 rounded-xl border border-app bg-app-accent-light text-app-accent hover:opacity-90 font-bold text-xs flex items-center gap-1.5 transition-all shadow-xs"
-            title="Bu Görev İçin Hızlı Not Oluştur"
+            title="Bu Görev İçin Zengin Not Şablonu Oluştur"
           >
             <NotebookPen className="w-4 h-4" /> Hızlı Not Ekle
           </button>
@@ -884,17 +941,54 @@ export default function TaskDetail({ onEditTask, onShareTask }) {
         </div>
       )}
 
+      {/* Toast Notification Banner */}
+      {showNoteToast && (
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900/90 backdrop-blur-md border border-emerald-500/40 text-white p-4 rounded-2xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom-5 duration-300">
+          <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold shrink-0">
+            <CheckCircle2 className="w-5 h-5" />
+          </div>
+          <div>
+            <h4 className="font-bold text-xs text-white">Not Başarıyla Kaydedildi!</h4>
+            <p className="text-[11px] text-slate-300 mt-0.5">
+              Notlarım sayfasından düzenleyebilir veya inceleyebilirsiniz.
+            </p>
+          </div>
+          <button
+            onClick={() => setShowNoteToast(false)}
+            className="p-1 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition-colors ml-2"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
       {/* Hızlı Not Ekle Modalı */}
       {isQuickNoteOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-app-surface border border-app rounded-3xl w-full max-w-lg p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in duration-200">
-            <h3 className="font-extrabold text-base text-app-primary flex items-center gap-2 border-b border-app pb-3">
-              <NotebookPen className="w-5 h-5 text-app-accent" /> Hızlı Not Oluştur
-            </h3>
-
-            <p className="text-xs text-app-secondary">
-              <strong>"{task.title}"</strong> görevi ile ilişkili hızlı bir not alıp doğrudan Notlarım sayfasına aktarabilirsiniz.
-            </p>
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-app-surface border border-app rounded-3xl w-full max-w-2xl p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in duration-200">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-app pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-app-accent-light text-app-accent flex items-center justify-center font-bold">
+                  <NotebookPen className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-app-primary flex items-center gap-2">
+                    Göreve Özel Hızlı Not Oluştur
+                    <Sparkles className="w-4 h-4 text-amber-500 animate-pulse" />
+                  </h3>
+                  <p className="text-xs text-app-secondary">
+                    <strong className="text-app-primary">"{task.title}"</strong> ile ilişkili not taslağı otomatik oluşturuldu
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsQuickNoteOpen(false)}
+                className="p-2 rounded-xl text-app-muted hover:text-app-primary hover:bg-app-primary transition-all"
+              >
+                <X size={18} />
+              </button>
+            </div>
 
             <form
               onSubmit={async (e) => {
@@ -911,13 +1005,15 @@ export default function TaskDetail({ onEditTask, onShareTask }) {
                 setQuickNoteContent('');
                 setQuickNoteImages([]);
                 setQuickNoteAttachments([]);
-                alert('Not başarıyla kaydedildi! Notlarım sayfasında görüntüleyebilirsiniz.');
+                setShowNoteToast(true);
+                setTimeout(() => setShowNoteToast(false), 4000);
               }}
               className="space-y-4"
             >
+              {/* Category selector */}
               <div className="relative">
-                <label className="block text-xs font-bold text-app-secondary mb-1">
-                  Kategori
+                <label className="block text-xs font-bold text-app-secondary mb-1.5">
+                  Not Kategorisi
                 </label>
                 <div className="flex items-center gap-2">
                   <select
@@ -930,7 +1026,7 @@ export default function TaskDetail({ onEditTask, onShareTask }) {
                         setShowNewNoteCatInput(false);
                       }
                     }}
-                    className="w-full px-3.5 py-2 rounded-2xl border border-app bg-app-primary text-app-primary text-xs font-semibold focus:outline-none cursor-pointer"
+                    className="w-full px-3.5 py-2.5 rounded-2xl border border-app bg-app-primary text-app-primary text-xs font-bold focus:outline-none focus:ring-2 focus:ring-app-accent/40 cursor-pointer shadow-xs"
                   >
                     {getNoteCategories().map((cat) => (
                       <option key={cat} value={cat}>
@@ -944,7 +1040,7 @@ export default function TaskDetail({ onEditTask, onShareTask }) {
                   </select>
 
                   {showNewNoteCatInput && (
-                    <div className="absolute right-0 top-6 flex items-center gap-2 bg-app-surface p-1.5 rounded-xl border border-app-accent z-10 shadow-xl">
+                    <div className="absolute right-0 top-7 flex items-center gap-2 bg-app-surface p-2 rounded-2xl border border-app-accent z-20 shadow-2xl">
                       <input
                         type="text"
                         autoFocus
@@ -952,12 +1048,12 @@ export default function TaskDetail({ onEditTask, onShareTask }) {
                         onChange={(e) => setNewNoteCatName(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddNewNoteCategory())}
                         placeholder="Kategori Adı..."
-                        className="px-2.5 py-1 bg-app-primary text-app-primary text-xs font-semibold focus:outline-none min-w-[130px] rounded-lg border border-app"
+                        className="px-3 py-1.5 bg-app-primary text-app-primary text-xs font-bold focus:outline-none min-w-[140px] rounded-xl border border-app"
                       />
-                      <button type="button" onClick={handleAddNewNoteCategory} className="p-1 text-emerald-500 hover:bg-emerald-500/10 rounded-md">
+                      <button type="button" onClick={handleAddNewNoteCategory} className="p-1.5 text-emerald-500 hover:bg-emerald-500/10 rounded-xl">
                         <Check size={16} />
                       </button>
-                      <button type="button" onClick={() => setShowNewNoteCatInput(false)} className="p-1 text-rose-500 hover:bg-rose-500/10 rounded-md">
+                      <button type="button" onClick={() => setShowNewNoteCatInput(false)} className="p-1.5 text-rose-500 hover:bg-rose-500/10 rounded-xl">
                         <X size={16} />
                       </button>
                     </div>
@@ -965,51 +1061,52 @@ export default function TaskDetail({ onEditTask, onShareTask }) {
                 </div>
               </div>
 
+              {/* Textarea & Attachment Bar */}
               <div>
-                <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-xs font-bold text-app-secondary">
-                    Not İçeriği * <span className="text-[10px] font-normal text-app-muted">(CTRL+V ile resim yapıştırabilirsiniz)</span>
+                    Not İçeriği & Şablon * <span className="text-[10px] font-normal text-app-muted">(Resim için CTRL+V yapıştırabilirsiniz)</span>
                   </label>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1.5">
                     <button
                       type="button"
                       onClick={() => handleAddQuickNoteAttachment('file')}
-                      className="px-2 py-1 rounded-lg border border-app text-app-secondary hover:text-blue-500 text-[10px] font-bold flex items-center gap-1 transition-all"
+                      className="px-2.5 py-1 rounded-xl border border-app bg-app-primary text-app-secondary hover:text-blue-500 hover:border-blue-500/30 text-[11px] font-bold flex items-center gap-1.5 transition-all shadow-xs"
                     >
-                      <Paperclip size={12} /> Dosya Ekle
+                      <Paperclip size={13} /> Dosya Ekle
                     </button>
                     <button
                       type="button"
                       onClick={() => handleAddQuickNoteAttachment('folder')}
-                      className="px-2 py-1 rounded-lg border border-app text-app-secondary hover:text-amber-500 text-[10px] font-bold flex items-center gap-1 transition-all"
+                      className="px-2.5 py-1 rounded-xl border border-app bg-app-primary text-app-secondary hover:text-amber-500 hover:border-amber-500/30 text-[11px] font-bold flex items-center gap-1.5 transition-all shadow-xs"
                     >
-                      <FolderPlus size={12} /> Klasör Ekle
+                      <FolderPlus size={13} /> Klasör Ekle
                     </button>
                   </div>
                 </div>
                 <textarea
-                  rows={5}
+                  rows={8}
                   required
                   value={quickNoteContent}
                   onPaste={handleQuickNotePaste}
                   onChange={(e) => setQuickNoteContent(e.target.value)}
-                  placeholder="Not detaylarını yazın... Görsel yapıştırmak için resim kopyalayıp buraya CTRL+V yapabilirsiniz."
-                  className="w-full p-3.5 rounded-2xl border border-app bg-app-primary text-app-primary text-xs focus:outline-none focus:ring-2 focus:ring-app-accent/40"
+                  placeholder="Not detaylarını yazın..."
+                  className="w-full p-4 rounded-2xl border border-app bg-app-primary text-app-primary font-medium text-xs leading-relaxed focus:outline-none focus:ring-2 focus:ring-app-accent/40 shadow-inner"
                 />
               </div>
 
               {/* Eklenen Görseller */}
               {quickNoteImages.length > 0 && (
-                <div className="space-y-1">
-                  <span className="text-[11px] font-bold text-app-secondary">Yapıştırılan / Eklenen Görseller:</span>
-                  <div className="flex gap-2 flex-wrap">
+                <div className="space-y-1.5">
+                  <span className="text-[11px] font-bold text-app-secondary">Yapıştırılan / Eklenen Görseller ({quickNoteImages.length}):</span>
+                  <div className="flex gap-2.5 flex-wrap">
                     {quickNoteImages.map((src, idx) => (
                       <div key={idx} className="relative group">
-                        <img src={src} alt="eklenen-gorsel" className="w-14 h-14 object-cover rounded-xl border border-app shadow-xs" />
+                        <img src={src} alt="eklenen-gorsel" className="w-16 h-16 object-cover rounded-2xl border border-app shadow-xs transition-transform group-hover:scale-105" />
                         <button
                           type="button"
                           onClick={() => setQuickNoteImages((prev) => prev.filter((_, i) => i !== idx))}
-                          className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-xs"
+                          className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
                         >
                           <X size={12} />
                         </button>
@@ -1021,21 +1118,21 @@ export default function TaskDetail({ onEditTask, onShareTask }) {
 
               {/* Eklenen Dosyalar & Klasörler */}
               {quickNoteAttachments.length > 0 && (
-                <div className="space-y-1">
-                  <span className="text-[11px] font-bold text-app-secondary">Eklenen Dosya & Klasörler:</span>
-                  <div className="space-y-1 max-h-24 overflow-y-auto">
+                <div className="space-y-1.5">
+                  <span className="text-[11px] font-bold text-app-secondary">Eklenen Dosya & Klasörler ({quickNoteAttachments.length}):</span>
+                  <div className="space-y-1.5 max-h-28 overflow-y-auto">
                     {quickNoteAttachments.map((att, idx) => (
-                      <div key={idx} className="flex items-center justify-between p-2 rounded-xl bg-app-primary border border-app text-xs">
+                      <div key={idx} className="flex items-center justify-between p-2.5 rounded-2xl bg-app-primary border border-app text-xs shadow-xs">
                         <div className="flex items-center gap-2 truncate">
-                          {att.type === 'folder' ? <FolderPlus size={14} className="text-amber-500" /> : <Paperclip size={14} className="text-blue-500" />}
-                          <span className="truncate text-app-primary font-medium">{att.name}</span>
+                          {att.type === 'folder' ? <FolderPlus size={15} className="text-amber-500" /> : <Paperclip size={15} className="text-blue-500" />}
+                          <span className="truncate text-app-primary font-bold">{att.name}</span>
                         </div>
                         <button
                           type="button"
                           onClick={() => setQuickNoteAttachments((prev) => prev.filter((_, i) => i !== idx))}
                           className="text-rose-500 hover:text-rose-600 p-1"
                         >
-                          <X size={14} />
+                          <X size={15} />
                         </button>
                       </div>
                     ))}
@@ -1043,19 +1140,20 @@ export default function TaskDetail({ onEditTask, onShareTask }) {
                 </div>
               )}
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-app">
+              {/* Footer Actions */}
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-app">
                 <button
                   type="button"
                   onClick={() => setIsQuickNoteOpen(false)}
-                  className="px-4 py-2.5 rounded-2xl border border-app text-app-secondary font-bold text-xs"
+                  className="px-4 py-2.5 rounded-2xl border border-app text-app-secondary font-bold text-xs hover:bg-app-primary transition-colors"
                 >
                   İptal
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-2xl bg-app-accent text-white font-extrabold text-xs hover:opacity-90 shadow-md shadow-app-accent/20"
+                  className="px-6 py-2.5 rounded-2xl bg-gradient-to-r from-app-accent to-indigo-600 text-white font-extrabold text-xs hover:opacity-95 shadow-md shadow-app-accent/20 transition-all flex items-center gap-2"
                 >
-                  Notu Kaydet
+                  <NotebookPen className="w-4 h-4" /> Notu Kaydet
                 </button>
               </div>
             </form>
