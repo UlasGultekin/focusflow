@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   updateTask: (id, taskData) => ipcRenderer.invoke('tasks:update', id, taskData),
   deleteTask: (id) => ipcRenderer.invoke('tasks:delete', id),
   deleteRecurringGroup: (groupId) => ipcRenderer.invoke('tasks:deleteGroup', groupId),
+  updateRecurringGroup: (groupId, taskData) => ipcRenderer.invoke('tasks:updateGroup', groupId, taskData),
 
   // Subtasks (Görev 18)
   getSubtasks: (taskId) => ipcRenderer.invoke('subtasks:get', taskId),

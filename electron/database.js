@@ -627,6 +627,27 @@ export function deleteRecurringGroup(groupId) {
   return true;
 }
 
+export function updateRecurringGroup(groupId, taskData) {
+  if (!groupId) return false;
+  const now = new Date().toISOString();
+  const fields = [];
+  const values = [];
+
+  for (const [key, val] of Object.entries(taskData)) {
+    if (key !== 'id' && key !== 'planned_date') {
+      fields.push(`${key} = ?`);
+      values.push(val);
+    }
+  }
+  fields.push('updated_at = ?');
+  values.push(now);
+
+  const sql = `UPDATE tasks SET ${fields.join(', ')} WHERE recurrence_group_id = '${groupId}'`;
+  db.run(sql, values);
+  saveDb();
+  return true;
+}
+
 export function updateTask(id, taskData) {
   const now = new Date().toISOString();
   const fields = [];

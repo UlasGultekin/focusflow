@@ -9,6 +9,7 @@ import {
   updateTask,
   deleteTask,
   deleteRecurringGroup,
+  updateRecurringGroup,
   getSubtasks,
   addSubtask,
   updateSubtask,
@@ -232,6 +233,7 @@ function setupIPCHandlers() {
   ipcMain.handle('tasks:update', (_, id, taskData) => updateTask(id, taskData));
   ipcMain.handle('tasks:delete', (_, id) => deleteTask(id));
   ipcMain.handle('tasks:deleteGroup', (_, groupId) => deleteRecurringGroup(groupId));
+  ipcMain.handle('tasks:updateGroup', (_, groupId, taskData) => updateRecurringGroup(groupId, taskData));
 
   // Subtasks (Görev 18)
   ipcMain.handle('subtasks:get', (_, taskId) => getSubtasks(taskId));
