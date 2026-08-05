@@ -265,27 +265,22 @@ export async function initDatabase() {
     db.run("UPDATE tasks SET status = 'todo' WHERE status = 'active'");
     db.run("UPDATE tasks SET status = 'done' WHERE status = 'completed'");
 
-    // Add columns dynamically for backwards compatibility
-    try {
-      db.run("ALTER TABLE notes ADD COLUMN attachments_json TEXT");
-    } catch (e) {
-      // Column might already exist
-    }
-    try {
-      db.run("ALTER TABLE notes ADD COLUMN planned_date TEXT");
-    } catch (e) {
-      // Column might already exist
-    }
-    try {
-      db.run("ALTER TABLE notes ADD COLUMN planned_start_time TEXT");
-    } catch (e) {
-      // Column might already exist
-    }
-
-    // notes tablosuna category sütunu ekle
+    // notes tablosuna yeni sütunlar ekle (migrasyon güvenliği)
     const notesInfo = db.exec("PRAGMA table_info(notes)");
     if (notesInfo.length > 0) {
       const notesCols = notesInfo[0].values.map((col) => col[1]);
+      if (!notesCols.includes('images_json')) {
+        db.run("ALTER TABLE notes ADD COLUMN images_json TEXT DEFAULT '[]'");
+      }
+      if (!notesCols.includes('attachments_json')) {
+        db.run("ALTER TABLE notes ADD COLUMN attachments_json TEXT DEFAULT '[]'");
+      }
+      if (!notesCols.includes('planned_date')) {
+        db.run("ALTER TABLE notes ADD COLUMN planned_date TEXT");
+      }
+      if (!notesCols.includes('planned_start_time')) {
+        db.run("ALTER TABLE notes ADD COLUMN planned_start_time TEXT");
+      }
       if (!notesCols.includes('category')) {
         db.run("ALTER TABLE notes ADD COLUMN category TEXT DEFAULT 'Genel'");
       }
