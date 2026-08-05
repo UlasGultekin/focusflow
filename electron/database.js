@@ -252,6 +252,9 @@ export async function initDatabase() {
       if (!columns.includes('recurrence_rule')) {
         db.run("ALTER TABLE tasks ADD COLUMN recurrence_rule TEXT");
       }
+      if (!columns.includes('images_json')) {
+        db.run("ALTER TABLE tasks ADD COLUMN images_json TEXT DEFAULT '[]'");
+      }
     }
 
     const sessionInfo = db.exec("PRAGMA table_info(task_sessions)");

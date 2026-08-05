@@ -25,8 +25,67 @@ import {
   X,
   Sparkles,
   NotebookPen,
+  ImageIcon,
+  Eye,
 } from 'lucide-react';
 import { useTaskStore } from '../stores/useTaskStore';
+
+/* ─── Lightbox ──────────────────────────────────────────────────────── */
+function Lightbox({ src, onClose }) {
+  useEffect(() => {
+    const handler = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
+
+  return (
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex items-center justify-center animate-in fade-in duration-200"
+    >
+      <button
+        onClick={onClose}
+        className="absolute top-6 right-6 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-colors"
+      >
+        <X size={20} />
+      </button>
+      <img
+        src={src}
+        onClick={(e) => e.stopPropagation()}
+        className="max-w-[90vw] max-h-[88vh] rounded-xl shadow-2xl animate-in zoom-in-95 duration-200"
+        alt="Önizleme"
+      />
+    </div>
+  );
+}
+
+/* ─── Image strip inside task ───────────────────────────────────────── */
+function ImageStrip({ images, onRemove, onOpen }) {
+  if (!images || images.length === 0) return null;
+  return (
+    <div className="flex gap-2 flex-wrap mt-3">
+      {images.map((src, i) => (
+        <div key={i} className="relative group inline-block">
+          <img
+            src={src}
+            alt={`görsel-${i + 1}`}
+            onClick={() => onOpen && onOpen(src)}
+            className="w-16 h-16 md:w-20 md:h-20 object-cover rounded-xl cursor-pointer border border-app shadow-sm transition-transform duration-200 group-hover:scale-105 group-hover:shadow-md"
+          />
+          {onRemove && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onRemove(i); }}
+              className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:bg-red-600"
+              title="Görseli Sil"
+            >
+              <X size={12} />
+            </button>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function TaskDetail({ onEditTask, onShareTask }) {
   const {
@@ -77,8 +136,24 @@ export default function TaskDetail({ onEditTask, onShareTask }) {
   const [deepWorkEntries, setDeepWorkEntries] = useState([]);
   const [newDeepWorkContent, setNewDeepWorkContent] = useState('');
 
+  const [taskImages, setTaskImages] = useState([]);
+  const [lightboxSrc, setLightboxSrc] = useState(null);
+
   const task = tasks.find((t) => t.id === selectedTaskId);
   const subtasks = task ? subtasksMap[task.id] || [] : [];
+
+  useEffect(() => {
+    if (task && task.images_json) {
+      try {
+        const parsed = JSON.parse(task.images_json || '[]');
+        setTaskImages(Array.isArray(parsed) ? parsed : []);
+      } catch {
+        setTaskImages([]);
+      }
+    } else {
+      setTaskImages([]);
+    }
+  }, [task?.id, task?.images_json]);
 
   useEffect(() => {
     if (fetchAllNotes) fetchAllNotes();
@@ -90,6 +165,29 @@ export default function TaskDetail({ onEditTask, onShareTask }) {
       loadDeepWork();
     }
   }, [selectedTaskId]);
+
+  useEffect(() => {
+    const handleGlobalPaste = (e) => {
+      if (!selectedTaskId || !task) return;
+      // Don't intercept if user is typing in a text input or textarea
+      const activeTag = document.activeElement?.tagName?.toLowerCase();
+      if (activeTag === 'input' || activeTag === 'textarea') {
+        const isFileInput = document.activeElement?.type === 'file';
+        if (!isFileInput) return;
+      }
+
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      const imageItems = Array.from(items).filter((it) => it.type.startsWith('image/'));
+      if (!imageItems.length) return;
+      e.preventDefault();
+      const files = imageItems.map((it) => it.getAsFile()).filter(Boolean);
+      handleTaskImageFiles(files);
+    };
+
+    window.addEventListener('paste', handleGlobalPaste);
+    return () => window.removeEventListener('paste', handleGlobalPaste);
+  }, [selectedTaskId, task, taskImages]);
 
   // Extract all categories from existing notes + defaults + localStorage custom categories
   const getNoteCategories = () => {
@@ -126,6 +224,45 @@ export default function TaskDetail({ onEditTask, onShareTask }) {
     }
     setNewNoteCatName('');
     setShowNewNoteCatInput(false);
+  };
+
+  /* ── Task Image Paste & File Handlers ── */
+  const handleTaskImageFiles = async (files) => {
+    const imageFiles = Array.from(files).filter((f) => f.type.startsWith('image/'));
+    if (!imageFiles.length || !task) return;
+
+    const newImages = [];
+    for (const file of imageFiles) {
+      const dataUrl = await new Promise((res) => {
+        const reader = new FileReader();
+        reader.onload = (evt) => res(evt.target?.result);
+        reader.readAsDataURL(file);
+      });
+      if (dataUrl) newImages.push(dataUrl);
+    }
+
+    if (newImages.length > 0) {
+      const updatedImages = [...taskImages, ...newImages];
+      setTaskImages(updatedImages);
+      await updateTask(task.id, { images_json: JSON.stringify(updatedImages) });
+    }
+  };
+
+  const handleTaskPaste = async (e) => {
+    const items = e.clipboardData?.items;
+    if (!items || !task) return;
+    const imageItems = Array.from(items).filter((it) => it.type.startsWith('image/'));
+    if (!imageItems.length) return;
+    e.preventDefault();
+    const files = imageItems.map((it) => it.getAsFile()).filter(Boolean);
+    await handleTaskImageFiles(files);
+  };
+
+  const handleRemoveTaskImage = async (index) => {
+    if (!task) return;
+    const updated = taskImages.filter((_, i) => i !== index);
+    setTaskImages(updated);
+    await updateTask(task.id, { images_json: JSON.stringify(updated) });
   };
 
   /* ── Quick Note Attachment & Paste Handlers ── */
@@ -184,11 +321,22 @@ export default function TaskDetail({ onEditTask, onShareTask }) {
     }
   };
 
+  const [editingDeepWorkId, setEditingDeepWorkId] = useState(null);
+  const [editingDeepWorkContent, setEditingDeepWorkContent] = useState('');
+
   const handleAddDeepWorkEntry = async () => {
     if (!newDeepWorkContent.trim()) return;
     const sessionId = activeSession ? activeSession.id : null;
     await window.electronAPI.addDeepWorkEntry(task.id, sessionId, newDeepWorkContent);
     setNewDeepWorkContent('');
+    loadDeepWork();
+  };
+
+  const handleUpdateDeepWorkEntry = async (id) => {
+    if (!editingDeepWorkContent.trim()) return;
+    await window.electronAPI.updateDeepWorkEntry(id, editingDeepWorkContent.trim());
+    setEditingDeepWorkId(null);
+    setEditingDeepWorkContent('');
     loadDeepWork();
   };
 
@@ -331,7 +479,7 @@ export default function TaskDetail({ onEditTask, onShareTask }) {
   };
 
   return (
-    <div className="flex-1 h-full flex flex-col bg-app-primary overflow-y-auto p-6 space-y-6">
+    <div onPaste={handleTaskPaste} className="flex-1 h-full flex flex-col bg-app-primary overflow-y-auto p-6 space-y-6">
       {/* Header Bar */}
       <div className="flex items-start justify-between gap-4 border-b border-app pb-5">
         <div className="space-y-2 flex-1">
@@ -413,7 +561,7 @@ export default function TaskDetail({ onEditTask, onShareTask }) {
 
               setQuickNoteContent(template);
               setQuickNoteAttachments(taskAttsFormatted);
-              setQuickNoteImages([]);
+              setQuickNoteImages(taskImages || []);
               setIsQuickNoteOpen(true);
             }}
             className="px-3 py-2 rounded-xl border border-app bg-app-accent-light text-app-accent hover:opacity-90 font-bold text-xs flex items-center gap-1.5 transition-all shadow-xs"
@@ -728,17 +876,103 @@ export default function TaskDetail({ onEditTask, onShareTask }) {
                           </span>
                         )}
                       </div>
-                      <button onClick={() => handleDeleteDeepWorkEntry(entry.id)} className="text-app-muted hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={() => {
+                            setEditingDeepWorkId(entry.id);
+                            setEditingDeepWorkContent(entry.content);
+                          }}
+                          className="text-app-muted hover:text-purple-500 transition-colors"
+                          title="Düzelt / Düzenle"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteDeepWorkEntry(entry.id)}
+                          className="text-app-muted hover:text-rose-500 transition-colors"
+                          title="Sil"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
-                    <p className="text-xs text-app-secondary whitespace-pre-wrap">{entry.content}</p>
+
+                    {editingDeepWorkId === entry.id ? (
+                      <div className="space-y-2 pt-1">
+                        <textarea
+                          rows={2}
+                          value={editingDeepWorkContent}
+                          onChange={(e) => setEditingDeepWorkContent(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              e.preventDefault();
+                              handleUpdateDeepWorkEntry(entry.id);
+                            }
+                          }}
+                          className="w-full p-2 rounded-lg border border-app bg-app-surface text-app-primary text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
+                        />
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setEditingDeepWorkId(null)}
+                            className="px-2.5 py-1 text-[11px] font-semibold text-app-secondary hover:text-app-primary"
+                          >
+                            İptal
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateDeepWorkEntry(entry.id)}
+                            className="px-3 py-1 rounded-lg bg-purple-500 text-white font-bold text-[11px] hover:bg-purple-600 shadow-xs"
+                          >
+                            Kaydet
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-app-secondary whitespace-pre-wrap leading-relaxed">{entry.content}</p>
+                    )}
                   </div>
                 </div>
               );
             })
           )}
         </div>
+      </div>
+
+      {/* Task Images & Screen Captures Section */}
+      <div className="p-4 rounded-2xl bg-app-surface border border-app space-y-3 shadow-xs">
+        <div className="flex items-center justify-between">
+          <h3 className="font-bold text-xs text-app-primary flex items-center gap-1.5">
+            <ImageIcon className="w-4 h-4 text-indigo-500" /> Eklenen Resimler & Ekran Görüntüleri
+          </h3>
+          <button
+            onClick={() => document.getElementById('task-image-file-input').click()}
+            className="px-2.5 py-1 rounded-lg border border-app text-[11px] font-semibold text-app-primary hover:bg-app-surface-hover flex items-center gap-1.5 transition-all"
+            title="Resim Seç veya Ekran Görüntüsü Yapıştır (CTRL+V)"
+          >
+            <ImageIcon className="w-3.5 h-3.5 text-indigo-500" /> Resim Ekle (veya CTRL+V Yapıştır)
+            <input
+              id="task-image-file-input"
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => handleTaskImageFiles(e.target.files)}
+            />
+          </button>
+        </div>
+
+        {taskImages.length === 0 ? (
+          <div className="text-[11px] text-app-muted text-center py-3 border border-dashed border-app rounded-xl">
+            Henüz resim eklenmedi. Ekran görüntüsü yapıştırmak için sayfadayken <strong className="text-app-primary">CTRL+V</strong> yapabilirsiniz.
+          </div>
+        ) : (
+          <ImageStrip
+            images={taskImages}
+            onRemove={(idx) => handleRemoveTaskImage(idx)}
+            onOpen={(src) => setLightboxSrc(src)}
+          />
+        )}
       </div>
 
       {/* Attachments Section (Görev 15) */}
@@ -1159,6 +1393,10 @@ export default function TaskDetail({ onEditTask, onShareTask }) {
             </form>
           </div>
         </div>
+      )}
+      {/* Lightbox Preview */}
+      {lightboxSrc && (
+        <Lightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
       )}
     </div>
   );
