@@ -22,7 +22,9 @@ import {
   ArrowUp,
   ArrowDown,
   Check,
+  X,
   Sparkles,
+  NotebookPen,
 } from 'lucide-react';
 import { useTaskStore } from '../stores/useTaskStore';
 
@@ -42,7 +44,19 @@ export default function TaskDetail({ onEditTask, onShareTask }) {
     updateSubtask,
     deleteSubtask,
     reorderSubtasks,
+    addNote,
+    allNotes,
+    fetchAllNotes,
   } = useTaskStore();
+
+  const [isQuickNoteOpen, setIsQuickNoteOpen] = useState(false);
+  const [quickNoteContent, setQuickNoteContent] = useState('');
+  const [quickNoteCategory, setQuickNoteCategory] = useState('İş');
+  const [quickNoteImages, setQuickNoteImages] = useState([]);
+  const [quickNoteAttachments, setQuickNoteAttachments] = useState([]);
+
+  const [showNewNoteCatInput, setShowNewNoteCatInput] = useState(false);
+  const [newNoteCatName, setNewNoteCatName] = useState('');
 
   const [attachments, setAttachments] = useState([]);
   const [links, setLinks] = useState({ blockingMe: [], blockedByMe: [] });
@@ -65,6 +79,7 @@ export default function TaskDetail({ onEditTask, onShareTask }) {
   const subtasks = task ? subtasksMap[task.id] || [] : [];
 
   useEffect(() => {
+    if (fetchAllNotes) fetchAllNotes();
     if (selectedTaskId && window.electronAPI) {
       fetchSubtasks(selectedTaskId);
       loadAttachments();
@@ -73,6 +88,71 @@ export default function TaskDetail({ onEditTask, onShareTask }) {
       loadDeepWork();
     }
   }, [selectedTaskId]);
+
+  // Extract all categories from existing notes + defaults + localStorage custom categories
+  const getNoteCategories = () => {
+    const defaults = ['Genel', 'İş', 'Kişisel', 'Fikir', 'Önemli', 'Alışveriş'];
+    let custom = [];
+    try {
+      const saved = localStorage.getItem('focusflow_note_categories');
+      if (saved) custom = JSON.parse(saved);
+    } catch (e) {}
+
+    const fromNotes = (allNotes || []).map((n) => n.category).filter(Boolean);
+
+    // Also include current task's category if valid
+    const taskCat = task?.category ? [task.category] : [];
+
+    const combined = [...new Set([...defaults, ...custom, ...fromNotes, ...taskCat])];
+    return combined;
+  };
+
+  const handleAddNewNoteCategory = () => {
+    if (newNoteCatName.trim()) {
+      const cat = newNoteCatName.trim();
+      setQuickNoteCategory(cat);
+
+      // Save to custom note categories localStorage
+      try {
+        const saved = localStorage.getItem('focusflow_note_categories');
+        const existing = saved ? JSON.parse(saved) : ['Genel', 'İş', 'Kişisel', 'Fikir', 'Önemli', 'Alışveriş'];
+        if (!existing.includes(cat)) {
+          existing.push(cat);
+          localStorage.setItem('focusflow_note_categories', JSON.stringify(existing));
+        }
+      } catch (e) {}
+    }
+    setNewNoteCatName('');
+    setShowNewNoteCatInput(false);
+  };
+
+  /* ── Quick Note Attachment & Paste Handlers ── */
+  const handleQuickNotePaste = async (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    const imageItems = Array.from(items).filter((it) => it.type.startsWith('image/'));
+    if (!imageItems.length) return;
+    e.preventDefault();
+    const files = imageItems.map((it) => it.getAsFile()).filter(Boolean);
+    
+    for (const file of files) {
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        if (evt.target?.result) {
+          setQuickNoteImages((prev) => [...prev, evt.target.result]);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleAddQuickNoteAttachment = async (type) => {
+    if (!window.electronAPI) return;
+    const res = type === 'file' ? await window.electronAPI.selectFile() : await window.electronAPI.selectFolder();
+    if (res) {
+      setQuickNoteAttachments((prev) => [...prev, res]);
+    }
+  };
 
   const loadAttachments = async () => {
     if (selectedTaskId && window.electronAPI.getTaskAttachments) {
@@ -274,6 +354,16 @@ export default function TaskDetail({ onEditTask, onShareTask }) {
 
         {/* Action Controls */}
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              setQuickNoteContent(`📌 ${task.title}\n\n`);
+              setIsQuickNoteOpen(true);
+            }}
+            className="px-3 py-2 rounded-xl border border-app bg-app-accent-light text-app-accent hover:opacity-90 font-bold text-xs flex items-center gap-1.5 transition-all shadow-xs"
+            title="Bu Görev İçin Hızlı Not Oluştur"
+          >
+            <NotebookPen className="w-4 h-4" /> Hızlı Not Ekle
+          </button>
           <button
             onClick={() => onShareTask && onShareTask(task)}
             className="p-2 rounded-xl border border-app text-app-secondary hover:text-app-primary hover:bg-app-surface"
@@ -787,6 +877,185 @@ export default function TaskDetail({ onEditTask, onShareTask }) {
                   className="px-4 py-2 rounded-xl bg-app-accent text-white font-semibold text-xs"
                 >
                   Ekle
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Hızlı Not Ekle Modalı */}
+      {isQuickNoteOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-app-surface border border-app rounded-3xl w-full max-w-lg p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in duration-200">
+            <h3 className="font-extrabold text-base text-app-primary flex items-center gap-2 border-b border-app pb-3">
+              <NotebookPen className="w-5 h-5 text-app-accent" /> Hızlı Not Oluştur
+            </h3>
+
+            <p className="text-xs text-app-secondary">
+              <strong>"{task.title}"</strong> görevi ile ilişkili hızlı bir not alıp doğrudan Notlarım sayfasına aktarabilirsiniz.
+            </p>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!quickNoteContent.trim()) return;
+                await addNote(
+                  quickNoteContent.trim(),
+                  task.id,
+                  quickNoteCategory,
+                  quickNoteImages,
+                  quickNoteAttachments
+                );
+                setIsQuickNoteOpen(false);
+                setQuickNoteContent('');
+                setQuickNoteImages([]);
+                setQuickNoteAttachments([]);
+                alert('Not başarıyla kaydedildi! Notlarım sayfasında görüntüleyebilirsiniz.');
+              }}
+              className="space-y-4"
+            >
+              <div className="relative">
+                <label className="block text-xs font-bold text-app-secondary mb-1">
+                  Kategori
+                </label>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={quickNoteCategory}
+                    onChange={(e) => {
+                      if (e.target.value === 'add_new') {
+                        setShowNewNoteCatInput(true);
+                      } else {
+                        setQuickNoteCategory(e.target.value);
+                        setShowNewNoteCatInput(false);
+                      }
+                    }}
+                    className="w-full px-3.5 py-2 rounded-2xl border border-app bg-app-primary text-app-primary text-xs font-semibold focus:outline-none cursor-pointer"
+                  >
+                    {getNoteCategories().map((cat) => (
+                      <option key={cat} value={cat}>
+                        {cat} {cat === task?.category ? '(Görev Kategorisi)' : ''}
+                      </option>
+                    ))}
+                    {!getNoteCategories().includes(quickNoteCategory) && quickNoteCategory && (
+                      <option value={quickNoteCategory}>{quickNoteCategory}</option>
+                    )}
+                    <option value="add_new">+ Yeni Kategori Oluştur</option>
+                  </select>
+
+                  {showNewNoteCatInput && (
+                    <div className="absolute right-0 top-6 flex items-center gap-2 bg-app-surface p-1.5 rounded-xl border border-app-accent z-10 shadow-xl">
+                      <input
+                        type="text"
+                        autoFocus
+                        value={newNoteCatName}
+                        onChange={(e) => setNewNoteCatName(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddNewNoteCategory())}
+                        placeholder="Kategori Adı..."
+                        className="px-2.5 py-1 bg-app-primary text-app-primary text-xs font-semibold focus:outline-none min-w-[130px] rounded-lg border border-app"
+                      />
+                      <button type="button" onClick={handleAddNewNoteCategory} className="p-1 text-emerald-500 hover:bg-emerald-500/10 rounded-md">
+                        <Check size={16} />
+                      </button>
+                      <button type="button" onClick={() => setShowNewNoteCatInput(false)} className="p-1 text-rose-500 hover:bg-rose-500/10 rounded-md">
+                        <X size={16} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-app-secondary">
+                    Not İçeriği * <span className="text-[10px] font-normal text-app-muted">(CTRL+V ile resim yapıştırabilirsiniz)</span>
+                  </label>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => handleAddQuickNoteAttachment('file')}
+                      className="px-2 py-1 rounded-lg border border-app text-app-secondary hover:text-blue-500 text-[10px] font-bold flex items-center gap-1 transition-all"
+                    >
+                      <Paperclip size={12} /> Dosya Ekle
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAddQuickNoteAttachment('folder')}
+                      className="px-2 py-1 rounded-lg border border-app text-app-secondary hover:text-amber-500 text-[10px] font-bold flex items-center gap-1 transition-all"
+                    >
+                      <FolderPlus size={12} /> Klasör Ekle
+                    </button>
+                  </div>
+                </div>
+                <textarea
+                  rows={5}
+                  required
+                  value={quickNoteContent}
+                  onPaste={handleQuickNotePaste}
+                  onChange={(e) => setQuickNoteContent(e.target.value)}
+                  placeholder="Not detaylarını yazın... Görsel yapıştırmak için resim kopyalayıp buraya CTRL+V yapabilirsiniz."
+                  className="w-full p-3.5 rounded-2xl border border-app bg-app-primary text-app-primary text-xs focus:outline-none focus:ring-2 focus:ring-app-accent/40"
+                />
+              </div>
+
+              {/* Eklenen Görseller */}
+              {quickNoteImages.length > 0 && (
+                <div className="space-y-1">
+                  <span className="text-[11px] font-bold text-app-secondary">Yapıştırılan / Eklenen Görseller:</span>
+                  <div className="flex gap-2 flex-wrap">
+                    {quickNoteImages.map((src, idx) => (
+                      <div key={idx} className="relative group">
+                        <img src={src} alt="eklenen-gorsel" className="w-14 h-14 object-cover rounded-xl border border-app shadow-xs" />
+                        <button
+                          type="button"
+                          onClick={() => setQuickNoteImages((prev) => prev.filter((_, i) => i !== idx))}
+                          className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-xs"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Eklenen Dosyalar & Klasörler */}
+              {quickNoteAttachments.length > 0 && (
+                <div className="space-y-1">
+                  <span className="text-[11px] font-bold text-app-secondary">Eklenen Dosya & Klasörler:</span>
+                  <div className="space-y-1 max-h-24 overflow-y-auto">
+                    {quickNoteAttachments.map((att, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-2 rounded-xl bg-app-primary border border-app text-xs">
+                        <div className="flex items-center gap-2 truncate">
+                          {att.type === 'folder' ? <FolderPlus size={14} className="text-amber-500" /> : <Paperclip size={14} className="text-blue-500" />}
+                          <span className="truncate text-app-primary font-medium">{att.name}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setQuickNoteAttachments((prev) => prev.filter((_, i) => i !== idx))}
+                          className="text-rose-500 hover:text-rose-600 p-1"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-app">
+                <button
+                  type="button"
+                  onClick={() => setIsQuickNoteOpen(false)}
+                  className="px-4 py-2.5 rounded-2xl border border-app text-app-secondary font-bold text-xs"
+                >
+                  İptal
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-2xl bg-app-accent text-white font-extrabold text-xs hover:opacity-90 shadow-md shadow-app-accent/20"
+                >
+                  Notu Kaydet
                 </button>
               </div>
             </form>
