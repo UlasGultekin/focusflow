@@ -41,24 +41,33 @@ export const useBugStore = create((set, get) => ({
     }
   },
 
-  convertToTask: async (bug) => {
+  convertToTask: async (bug, taskType = 'task', options = {}) => {
     if (window.electronAPI) {
+      let typeLabel = 'Geliştirme / Çözüm';
+      if (taskType === 'inspection') typeLabel = 'İnceleme & Araştırma';
+      if (taskType === 'meeting') typeLabel = 'Toplantı & Görüşme';
+
       const taskData = {
-        title: bug.title,
-        description: `**(Bug'dan Dönüştürüldü)**\n\n**Önem Derecesi:** ${bug.severity || 'Belirtilmedi'}\n**Ortam:** ${bug.environment || 'Belirtilmedi'}\n**Adımlar:**\n${bug.reproduction_steps || 'Belirtilmedi'}\n\n${bug.description || ''}`,
+        title: options.customTitle || `[${typeLabel}] ${bug.title}`,
+        description: `**(Bug - ${typeLabel})**\n\n**Önem Derecesi:** ${bug.severity || 'Belirtilmedi'}\n**Ortam:** ${bug.environment || 'Belirtilmedi'}\n**Adımlar:**\n${bug.reproduction_steps || 'Belirtilmedi'}\n\n${bug.description || ''}`,
         priority: bug.priority || 'medium',
         category: 'Hata Çözümü',
-        planned_date: bug.planned_date || null,
-        task_type: 'task',
+        planned_date: options.plannedDate || bug.planned_date || null,
+        planned_start_time: options.plannedTime || '10:00',
+        task_type: taskType === 'meeting' ? 'event' : 'task',
         status: 'todo'
       };
       
       const newTask = await useTaskStore.getState().addTask(taskData);
       if (newTask && newTask.id) {
-        // Bug'ı göreve bağla ve durumunu in_progress veya open tutalım, çünkü sadece board'a taşıdık
-        await window.electronAPI.updateBug(bug.id, { task_id: newTask.id });
+        if (options.removeFromList) {
+          await window.electronAPI.deleteBug(bug.id);
+        } else {
+          await window.electronAPI.updateBug(bug.id, { task_id: newTask.id });
+        }
         await get().fetchBugs();
       }
+      return newTask;
     }
   }
 }));

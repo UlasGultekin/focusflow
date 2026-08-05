@@ -41,24 +41,34 @@ export const useTechDebtStore = create((set, get) => ({
     }
   },
 
-  convertToTask: async (item) => {
+  convertToTask: async (item, taskType = 'task', options = {}) => {
     if (window.electronAPI) {
+      let typeLabel = 'Geliştirme / Refactor';
+      if (taskType === 'inspection') typeLabel = 'İnceleme & Araştırma';
+      if (taskType === 'meeting') typeLabel = 'Toplantı & Görüşme';
+
       const taskData = {
-        title: item.title,
-        description: `**(Teknik Borç'tan Dönüştürüldü)**\n\n**Kategori:** ${item.category || 'Belirtilmedi'}\n\n${item.description || ''}`,
+        title: options.customTitle || `[${typeLabel}] ${item.title}`,
+        description: `**(Teknik Borç - ${typeLabel})**\n\n**Kategori:** ${item.category || 'Belirtilmedi'}\n\n${item.description || ''}`,
         priority: item.priority || 'medium',
         category: 'Teknik İyileştirme',
         estimated_minutes: item.estimated_minutes || 60,
-        planned_date: item.planned_date || null,
-        task_type: 'task',
+        planned_date: options.plannedDate || item.planned_date || null,
+        planned_start_time: options.plannedTime || '10:00',
+        task_type: taskType === 'meeting' ? 'event' : 'task',
         status: 'todo'
       };
       
       const newTask = await useTaskStore.getState().addTask(taskData);
       if (newTask && newTask.id) {
-        await window.electronAPI.updateTechDebt(item.id, { task_id: newTask.id });
+        if (options.removeFromList) {
+          await window.electronAPI.deleteTechDebt(item.id);
+        } else {
+          await window.electronAPI.updateTechDebt(item.id, { task_id: newTask.id });
+        }
         await get().fetchTechDebts();
       }
+      return newTask;
     }
   }
 }));

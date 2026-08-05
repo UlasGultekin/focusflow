@@ -76,10 +76,44 @@ export default function BugsView() {
   const [reproductionSteps, setReproductionSteps] = useState('');
   const [environment, setEnvironment] = useState('');
   const [plannedDate, setPlannedDate] = useState('');
-  
   const [images, setImages] = useState([]);
   const [attachments, setAttachments] = useState([]);
   const [lightboxSrc, setLightboxSrc] = useState(null);
+
+  // Task Conversion Modal State
+  const [conversionModal, setConversionModal] = useState({
+    isOpen: false,
+    bug: null,
+    taskType: 'task', // 'inspection' | 'meeting' | 'task'
+    plannedDate: '',
+    plannedTime: '10:00',
+    removeFromList: false, // Default: false (opsiyonel)
+  });
+
+  const openConversionModal = (bug, taskType) => {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    setConversionModal({
+      isOpen: true,
+      bug,
+      taskType,
+      plannedDate: bug.planned_date || todayStr,
+      plannedTime: '10:00',
+      removeFromList: false,
+    });
+  };
+
+  const handleConfirmConversion = async (e) => {
+    e.preventDefault();
+    if (!conversionModal.bug) return;
+
+    await convertToTask(conversionModal.bug, conversionModal.taskType, {
+      plannedDate: conversionModal.plannedDate || null,
+      plannedTime: conversionModal.plannedTime || '10:00',
+      removeFromList: conversionModal.removeFromList,
+    });
+
+    setConversionModal((prev) => ({ ...prev, isOpen: false, bug: null }));
+  };
 
   const [project, setProject] = useState('Genel');
   const [projectFilter, setProjectFilter] = useState('all');
@@ -302,19 +336,35 @@ export default function BugsView() {
                     )}
 
                   </div>
-                  <div className="flex items-center gap-2">
-                    {!bug.task_id && (
+                  <div className="flex items-center gap-2 flex-wrap justify-end">
+                    <div className="flex items-center gap-1 bg-app-bg p-1 rounded-xl border border-app">
                       <button
-                        onClick={() => convertToTask(bug)}
-                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-500 text-white hover:bg-indigo-600 flex items-center gap-1"
+                        onClick={() => openConversionModal(bug, 'inspection')}
+                        className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 transition-all flex items-center gap-1"
+                        title="İnceleme & Araştırma Görevi Planla"
                       >
-                        <ArrowRight className="w-3 h-3" /> Göreve Dönüştür
+                        🔍 İnceleme Taskı
                       </button>
-                    )}
-                    <button onClick={() => openEditModal(bug)} className="p-1.5 text-app-muted hover:text-indigo-500 transition-colors">
+                      <button
+                        onClick={() => openConversionModal(bug, 'meeting')}
+                        className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-purple-500/10 text-purple-500 hover:bg-purple-500/20 transition-all flex items-center gap-1"
+                        title="Toplantı & Görüşme Etkinliği Planla"
+                      >
+                        📅 Meet Taskı
+                      </button>
+                      <button
+                        onClick={() => openConversionModal(bug, 'task')}
+                        className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-indigo-500 text-white hover:bg-indigo-600 transition-all flex items-center gap-1 shadow-xs"
+                        title="Tam Çözüm Görevi Planla"
+                      >
+                        <ArrowRight className="w-3 h-3" /> Görev Oluştur
+                      </button>
+                    </div>
+
+                    <button onClick={() => openEditModal(bug)} className="p-1.5 text-app-muted hover:text-indigo-500 transition-colors" title="Düzenle">
                       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-edit-3"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
                     </button>
-                    <button onClick={() => deleteBug(bug.id)} className="p-1.5 text-app-muted hover:text-rose-500 transition-colors">
+                    <button onClick={() => deleteBug(bug.id)} className="p-1.5 text-app-muted hover:text-rose-500 transition-colors" title="Sil (Onayınızla silinir)">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
@@ -349,37 +399,36 @@ export default function BugsView() {
                         <button type="button" onClick={() => setShowNewProjectInput(false)} className="p-2 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500/20"><X size={16} /></button>
                       </div>
                     ) : (
-                      <select value={project} onChange={(e) => { if (e.target.value === 'add_new') setShowNewProjectInput(true); else setProject(e.target.value); }} className="flex-1 bg-app-bg border border-app rounded-xl px-3 py-2 text-sm outline-hidden focus:border-rose-500">
-                        {availableProjects.map(p => (
-                          <option key={p} value={p}>{p}</option>
-                        ))}
+                      <select value={project} onChange={e => { if (e.target.value === 'add_new') setShowNewProjectInput(true); else setProject(e.target.value); }} className="flex-1 bg-app-bg border border-app rounded-xl px-3 py-2 text-sm outline-hidden focus:border-rose-500 cursor-pointer">
+                        {availableProjects.map(p => <option key={p} value={p}>{p}</option>)}
                         <option value="add_new">+ Yeni Proje Ekle</option>
                       </select>
                     )}
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-app-secondary mb-1">Önem Derecesi (Severity)</label>
+                  <label className="block text-xs font-semibold text-app-secondary mb-1">Önem Derecesi</label>
                   <select value={severity} onChange={(e) => setSeverity(e.target.value)} className="w-full bg-app-bg border border-app rounded-xl px-3 py-2 text-sm outline-hidden focus:border-rose-500">
-                    <option value="minor">Minor</option>
-                    <option value="major">Major</option>
-                    <option value="critical">Critical</option>
+                    <option value="minor">Minor (Düşük)</option>
+                    <option value="major">Major (Orta)</option>
+                    <option value="critical">Critical (Kritik)</option>
+                    <option value="blocker">Blocker (Engelleyici)</option>
                   </select>
                 </div>
               </div>
+              <div>
+                <label className="block text-xs font-semibold text-app-secondary mb-1">Tekrarlama Adımları</label>
+                <textarea value={reproductionSteps} onChange={(e) => setReproductionSteps(e.target.value)} rows={2} className="w-full bg-app-bg border border-app rounded-xl px-3 py-2 text-sm outline-hidden focus:border-rose-500" placeholder="1. Adım X yap..." />
+              </div>
               <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-app-secondary mb-1">Ortam / Çalıştığı Yer</label>
+                  <input value={environment} onChange={(e) => setEnvironment(e.target.value)} placeholder="Örn: Chrome v118 / Windows 11" className="w-full bg-app-bg border border-app rounded-xl px-3 py-2 text-sm outline-hidden focus:border-rose-500" />
+                </div>
                 <div>
                   <label className="block text-xs font-semibold text-app-secondary mb-1">Takvime Planla (Opsiyonel)</label>
                   <input type="date" value={plannedDate} onChange={(e) => setPlannedDate(e.target.value)} className="w-full bg-app-bg border border-app rounded-xl px-3 py-2 text-sm outline-hidden focus:border-rose-500" />
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-app-secondary mb-1">Çevre (Environment)</label>
-                  <input type="text" value={environment} onChange={(e) => setEnvironment(e.target.value)} placeholder="Prod, Staging, Local..." className="w-full bg-app-bg border border-app rounded-xl px-3 py-2 text-sm outline-hidden focus:border-rose-500" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-app-secondary mb-1">Tekrar Adımları</label>
-                <textarea onPaste={handlePaste} value={reproductionSteps} onChange={(e) => setReproductionSteps(e.target.value)} rows={2} className="w-full bg-app-bg border border-app rounded-xl px-3 py-2 text-sm outline-hidden focus:border-rose-500" />
               </div>
 
               {/* Attachments / Images Preview inside Modal */}
@@ -420,6 +469,78 @@ export default function BugsView() {
                   <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm font-semibold text-app-secondary hover:text-app-primary">İptal</button>
                   <button type="submit" className="px-4 py-2 bg-rose-500 hover:bg-rose-600 text-white text-sm font-semibold rounded-xl">Kaydet</button>
                 </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Görev / İnceleme / Meet Takvim Planlama Modalı */}
+      {conversionModal.isOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-app-surface border border-app rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in duration-200">
+            <h3 className="font-extrabold text-base text-app-primary flex items-center gap-2 border-b border-app pb-3">
+              {conversionModal.taskType === 'inspection' && '🔍 İnceleme Taskı Oluştur & Planla'}
+              {conversionModal.taskType === 'meeting' && '📅 Meet / Toplantı Taskı Oluştur & Planla'}
+              {conversionModal.taskType === 'task' && '➡️ Görev Oluştur & Takvime Planla'}
+            </h3>
+
+            <p className="text-xs text-app-secondary">
+              <strong className="text-app-primary">"{conversionModal.bug?.title}"</strong> için planlama detaylarını belirleyin:
+            </p>
+
+            <form onSubmit={handleConfirmConversion} className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-app-secondary mb-1">Takvim Tarihi (Opsiyonel)</label>
+                  <input
+                    type="date"
+                    value={conversionModal.plannedDate}
+                    onChange={(e) => setConversionModal((prev) => ({ ...prev, plannedDate: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-xl border border-app bg-app-primary text-app-primary text-xs font-semibold focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-app-secondary mb-1">Başlangıç Saati</label>
+                  <input
+                    type="time"
+                    value={conversionModal.plannedTime}
+                    onChange={(e) => setConversionModal((prev) => ({ ...prev, plannedTime: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-xl border border-app bg-app-primary text-app-primary text-xs font-semibold focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Opsiyonel Listeden Çıkartma Onayı (Default: unchecked) */}
+              <div className="p-3 bg-app-primary rounded-2xl border border-app space-y-1">
+                <label className="flex items-center gap-2.5 text-xs font-bold text-app-primary cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={conversionModal.removeFromList}
+                    onChange={(e) => setConversionModal((prev) => ({ ...prev, removeFromList: e.target.checked }))}
+                    className="w-4 h-4 rounded text-app-accent focus:ring-app-accent cursor-pointer"
+                  />
+                  <span>Açık Hatalar listesinden çıkartılsın mı?</span>
+                </label>
+                <p className="text-[10px] text-app-muted pl-6 font-medium">
+                  İşaretlerseniz göreve aktarıldıktan sonra bu bug listesinden silinir. İşaretlemezseniz listede kalmaya devam eder.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-app">
+                <button
+                  type="button"
+                  onClick={() => setConversionModal((prev) => ({ ...prev, isOpen: false, bug: null }))}
+                  className="px-4 py-2.5 rounded-2xl border border-app text-app-secondary font-bold text-xs"
+                >
+                  İptal
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-2xl bg-indigo-600 text-white font-extrabold text-xs hover:bg-indigo-700 shadow-md transition-all"
+                >
+                  Göreve Aktar
+                </button>
               </div>
             </form>
           </div>

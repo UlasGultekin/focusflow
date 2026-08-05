@@ -75,10 +75,44 @@ export default function TechDebtsView() {
   const [category, setCategory] = useState('refactor');
   const [estimatedMinutes, setEstimatedMinutes] = useState(60);
   const [plannedDate, setPlannedDate] = useState('');
-
   const [images, setImages] = useState([]);
   const [attachments, setAttachments] = useState([]);
   const [lightboxSrc, setLightboxSrc] = useState(null);
+
+  // Task Conversion Modal State
+  const [conversionModal, setConversionModal] = useState({
+    isOpen: false,
+    item: null,
+    taskType: 'task', // 'inspection' | 'meeting' | 'task'
+    plannedDate: '',
+    plannedTime: '10:00',
+    removeFromList: false, // Default: false (opsiyonel)
+  });
+
+  const openConversionModal = (item, taskType) => {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    setConversionModal({
+      isOpen: true,
+      item,
+      taskType,
+      plannedDate: item.planned_date || todayStr,
+      plannedTime: '10:00',
+      removeFromList: false,
+    });
+  };
+
+  const handleConfirmConversion = async (e) => {
+    e.preventDefault();
+    if (!conversionModal.item) return;
+
+    await convertToTask(conversionModal.item, conversionModal.taskType, {
+      plannedDate: conversionModal.plannedDate || null,
+      plannedTime: conversionModal.plannedTime || '10:00',
+      removeFromList: conversionModal.removeFromList,
+    });
+
+    setConversionModal((prev) => ({ ...prev, isOpen: false, item: null }));
+  };
 
   const [project, setProject] = useState('Genel');
   const [projectFilter, setProjectFilter] = useState('all');
@@ -298,19 +332,35 @@ export default function TechDebtsView() {
                       </div>
                     )}
                   </div>
-                  <div className="flex items-center gap-2">
-                    {!td.task_id && (
+                  <div className="flex items-center gap-2 flex-wrap justify-end">
+                    <div className="flex items-center gap-1 bg-app-bg p-1 rounded-xl border border-app">
                       <button
-                        onClick={() => convertToTask(td)}
-                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-500 text-white hover:bg-indigo-600 flex items-center gap-1"
+                        onClick={() => openConversionModal(td, 'inspection')}
+                        className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 transition-all flex items-center gap-1"
+                        title="İnceleme & Araştırma Görevi Planla"
                       >
-                        <ArrowRight className="w-3 h-3" /> Göreve Dönüştür
+                        🔍 İnceleme Taskı
                       </button>
-                    )}
-                    <button onClick={() => openEditModal(td)} className="p-1.5 text-app-muted hover:text-indigo-500 transition-colors">
+                      <button
+                        onClick={() => openConversionModal(td, 'meeting')}
+                        className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-purple-500/10 text-purple-500 hover:bg-purple-500/20 transition-all flex items-center gap-1"
+                        title="Toplantı & Görüşme Etkinliği Planla"
+                      >
+                        📅 Meet Taskı
+                      </button>
+                      <button
+                        onClick={() => openConversionModal(td, 'task')}
+                        className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-indigo-500 text-white hover:bg-indigo-600 transition-all flex items-center gap-1 shadow-xs"
+                        title="Tam İyileştirme Görevi Planla"
+                      >
+                        <ArrowRight className="w-3 h-3" /> Görev Oluştur
+                      </button>
+                    </div>
+
+                    <button onClick={() => openEditModal(td)} className="p-1.5 text-app-muted hover:text-indigo-500 transition-colors" title="Düzenle">
                       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-edit-3"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
                     </button>
-                    <button onClick={() => deleteTechDebt(td.id)} className="p-1.5 text-app-muted hover:text-amber-500 transition-colors">
+                    <button onClick={() => deleteTechDebt(td.id)} className="p-1.5 text-app-muted hover:text-amber-500 transition-colors" title="Sil (Onayınızla silinir)">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
@@ -414,6 +464,78 @@ export default function TechDebtsView() {
                   <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm font-semibold text-app-secondary hover:text-app-primary">İptal</button>
                   <button type="submit" className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold rounded-xl">Kaydet</button>
                 </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Görev / İnceleme / Meet Takvim Planlama Modalı */}
+      {conversionModal.isOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-app-surface border border-app rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in duration-200">
+            <h3 className="font-extrabold text-base text-app-primary flex items-center gap-2 border-b border-app pb-3">
+              {conversionModal.taskType === 'inspection' && '🔍 İnceleme Taskı Oluştur & Planla'}
+              {conversionModal.taskType === 'meeting' && '📅 Meet / Toplantı Taskı Oluştur & Planla'}
+              {conversionModal.taskType === 'task' && '➡️ Görev Oluştur & Takvime Planla'}
+            </h3>
+
+            <p className="text-xs text-app-secondary">
+              <strong className="text-app-primary">"{conversionModal.item?.title}"</strong> için planlama detaylarını belirleyin:
+            </p>
+
+            <form onSubmit={handleConfirmConversion} className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-app-secondary mb-1">Takvim Tarihi (Opsiyonel)</label>
+                  <input
+                    type="date"
+                    value={conversionModal.plannedDate}
+                    onChange={(e) => setConversionModal((prev) => ({ ...prev, plannedDate: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-xl border border-app bg-app-primary text-app-primary text-xs font-semibold focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-app-secondary mb-1">Başlangıç Saati</label>
+                  <input
+                    type="time"
+                    value={conversionModal.plannedTime}
+                    onChange={(e) => setConversionModal((prev) => ({ ...prev, plannedTime: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-xl border border-app bg-app-primary text-app-primary text-xs font-semibold focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Opsiyonel Listeden Çıkartma Onayı (Default: unchecked) */}
+              <div className="p-3 bg-app-primary rounded-2xl border border-app space-y-1">
+                <label className="flex items-center gap-2.5 text-xs font-bold text-app-primary cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={conversionModal.removeFromList}
+                    onChange={(e) => setConversionModal((prev) => ({ ...prev, removeFromList: e.target.checked }))}
+                    className="w-4 h-4 rounded text-app-accent focus:ring-app-accent cursor-pointer"
+                  />
+                  <span>Teknik Borçlar listesinden çıkartılsın mı?</span>
+                </label>
+                <p className="text-[10px] text-app-muted pl-6 font-medium">
+                  İşaretlerseniz göreve aktarıldıktan sonra bu borç listesinden silinir. İşaretlemezseniz listede kalmaya devam eder.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-app">
+                <button
+                  type="button"
+                  onClick={() => setConversionModal((prev) => ({ ...prev, isOpen: false, item: null }))}
+                  className="px-4 py-2.5 rounded-2xl border border-app text-app-secondary font-bold text-xs"
+                >
+                  İptal
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-2xl bg-indigo-600 text-white font-extrabold text-xs hover:bg-indigo-700 shadow-md transition-all"
+                >
+                  Göreve Aktar
+                </button>
               </div>
             </form>
           </div>
