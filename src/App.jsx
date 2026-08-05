@@ -14,6 +14,7 @@ import NotesView from './components/NotesView';
 import SearchView from './components/SearchView';
 import AnalyticsView from './components/AnalyticsView';
 import SettingsView from './components/SettingsView';
+import DashboardView from './components/DashboardView';
 import BugsView from './components/BugsView';
 import TechDebtsView from './components/TechDebtsView';
 import StandupModal from './components/StandupModal';
@@ -27,7 +28,7 @@ import { useSearchStore } from './stores/useSearchStore';
 import { useTimerStore } from './stores/useTimerStore';
 
 export default function App() {
-  const [currentTab, setCurrentTab] = useState('tasks');
+  const [currentTab, setCurrentTab] = useState('dashboard');
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [isStandupModalOpen, setIsStandupModalOpen] = useState(false);
   const [taskToEdit, setTaskToEdit] = useState(null);
@@ -122,6 +123,10 @@ export default function App() {
 
       {/* Main View Area */}
       <main className="flex-1 flex flex-col h-full overflow-hidden">
+        {currentTab === 'dashboard' && (
+          <DashboardView onNavigate={(tab) => setCurrentTab(tab)} />
+        )}
+
         {currentTab === 'tasks' && (
           <div className="flex-1 flex h-full overflow-hidden">
             {/* Left Panel: Task List */}

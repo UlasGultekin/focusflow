@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
 const DEFAULT_MENU_LABELS = {
+  dashboard: 'Kontrol Paneli (Dashboard)',
   tasks: 'Görevler',
   board: 'Pano (Kanban)',
   calendar: 'Takvim',

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   LayoutList, Kanban, Calendar, GraduationCap, Flame, BookHeart,
   NotebookPen, BarChart3, Search, Settings, Sparkles, Moon, Sun,
-  Pencil, Check, X, RotateCcw, Link2, Bug, Wrench,
+  Pencil, Check, X, RotateCcw, Link2, Bug, Wrench, LayoutDashboard,
 } from 'lucide-react';
 import { useSettingsStore, DEFAULT_MENU_LABELS } from '../stores/useSettingsStore';
 
@@ -14,6 +14,7 @@ export default function Sidebar({ currentTab, setCurrentTab, onOpenStandup }) {
   const [isEditMode, setIsEditMode] = useState(false);
 
   const menuItems = [
+    { id: 'dashboard', icon: LayoutDashboard },
     { id: 'tasks', icon: LayoutList },
     { id: 'board', icon: Kanban },
     { id: 'calendar', icon: Calendar },
