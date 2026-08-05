@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   addTask: (taskData) => ipcRenderer.invoke('tasks:add', taskData),
   updateTask: (id, taskData) => ipcRenderer.invoke('tasks:update', id, taskData),
   deleteTask: (id) => ipcRenderer.invoke('tasks:delete', id),
+  deleteRecurringGroup: (groupId) => ipcRenderer.invoke('tasks:deleteGroup', groupId),
 
   // Subtasks (Görev 18)
   getSubtasks: (taskId) => ipcRenderer.invoke('subtasks:get', taskId),
@@ -53,6 +54,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Links
   getLinks: () => ipcRenderer.invoke('links:get'),
   addLink: (linkData) => ipcRenderer.invoke('links:add', linkData),
+  addBatchLinks: (linksArray) => ipcRenderer.invoke('links:addBatch', linksArray),
   updateLink: (id, linkData) => ipcRenderer.invoke('links:update', id, linkData),
   deleteLink: (id) => ipcRenderer.invoke('links:delete', id),
 
@@ -67,6 +69,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   addBug: (data) => ipcRenderer.invoke('bugs:add', data),
   updateBug: (id, data) => ipcRenderer.invoke('bugs:update', id, data),
   deleteBug: (id) => ipcRenderer.invoke('bugs:delete', id),
+
+  // Deep Work (Görev 28)
+  getDeepWorkEntries: (taskId) => ipcRenderer.invoke('deepwork:get', taskId),
+  addDeepWorkEntry: (taskId, sessionId, content) => ipcRenderer.invoke('deepwork:add', taskId, sessionId, content),
+  updateDeepWorkEntry: (id, content) => ipcRenderer.invoke('deepwork:update', id, content),
+  deleteDeepWorkEntry: (id) => ipcRenderer.invoke('deepwork:delete', id),
+
+  // Stand-up Report (Görev 27)
+  generateStandupReport: (dateStr) => ipcRenderer.invoke('standup:generate', dateStr),
 
   // Attachments (Görev 15)
   getTaskAttachments: (taskId) => ipcRenderer.invoke('attachments:get', taskId),

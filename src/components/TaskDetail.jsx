@@ -58,6 +58,9 @@ export default function TaskDetail({ onEditTask, onShareTask }) {
 
   const [manualMinutes, setManualMinutes] = useState('');
 
+  const [deepWorkEntries, setDeepWorkEntries] = useState([]);
+  const [newDeepWorkContent, setNewDeepWorkContent] = useState('');
+
   const task = tasks.find((t) => t.id === selectedTaskId);
   const subtasks = task ? subtasksMap[task.id] || [] : [];
 
@@ -67,6 +70,7 @@ export default function TaskDetail({ onEditTask, onShareTask }) {
       loadAttachments();
       loadLinks();
       loadBlockedStatus();
+      loadDeepWork();
     }
   }, [selectedTaskId]);
 
@@ -88,6 +92,28 @@ export default function TaskDetail({ onEditTask, onShareTask }) {
     if (selectedTaskId && window.electronAPI.isTaskBlocked) {
       const res = await window.electronAPI.isTaskBlocked(selectedTaskId);
       setIsBlockedInfo(res || { isBlocked: false, blockers: [] });
+    }
+  };
+
+  const loadDeepWork = async () => {
+    if (selectedTaskId && window.electronAPI.getDeepWorkEntries) {
+      const res = await window.electronAPI.getDeepWorkEntries(selectedTaskId);
+      setDeepWorkEntries(res || []);
+    }
+  };
+
+  const handleAddDeepWorkEntry = async () => {
+    if (!newDeepWorkContent.trim()) return;
+    const sessionId = activeSession ? activeSession.id : null;
+    await window.electronAPI.addDeepWorkEntry(task.id, sessionId, newDeepWorkContent);
+    setNewDeepWorkContent('');
+    loadDeepWork();
+  };
+
+  const handleDeleteDeepWorkEntry = async (id) => {
+    if (window.confirm("Bu düşünce akışı silinecek, emin misiniz?")) {
+      await window.electronAPI.deleteDeepWorkEntry(id);
+      loadDeepWork();
     }
   };
 
@@ -506,6 +532,66 @@ export default function TaskDetail({ onEditTask, onShareTask }) {
             Ekle
           </button>
         </form>
+      </div>
+
+      {/* Düşünce Akışı (Deep Work) */}
+      <div className="p-4 rounded-2xl bg-app-surface border border-app space-y-3 shadow-xs">
+        <h3 className="font-bold text-xs text-app-primary flex items-center gap-1.5">
+          <Sparkles className="w-4 h-4 text-purple-500" /> Düşünce Akışı
+        </h3>
+        
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={newDeepWorkContent}
+            onChange={(e) => setNewDeepWorkContent(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleAddDeepWorkEntry()}
+            placeholder="Bu çözüme nasıl ulaştığını, denediğin yöntemleri kaydet..."
+            className="flex-1 px-3 py-2 rounded-xl border border-app bg-app-primary text-app-primary text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
+          />
+          <button
+            onClick={handleAddDeepWorkEntry}
+            className="px-3 py-2 rounded-xl bg-purple-500 text-white font-semibold text-xs shrink-0 flex items-center gap-1 hover:bg-purple-600 transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" /> Ekle
+          </button>
+        </div>
+
+        <div className="space-y-3 mt-3 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-app before:opacity-30 pt-2">
+          {deepWorkEntries.length === 0 ? (
+            <p className="text-[11px] text-app-muted text-center py-2 relative z-10 bg-app-surface rounded-lg">
+              Bu görev için henüz düşünce akışı girişi yok. Zorlandığın anları, bulduğun çözümleri buraya kaydet.
+            </p>
+          ) : (
+            deepWorkEntries.map(entry => {
+              const d = new Date(entry.created_at);
+              const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+              return (
+                <div key={entry.id} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active z-10">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-full border border-app bg-app-primary text-purple-500 shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 shadow-xs">
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] p-3 rounded-xl border border-app bg-app-primary shadow-xs">
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-app-primary text-xs">{timeStr}</span>
+                        {entry.session_id && (
+                          <span className="text-[9px] font-semibold bg-purple-500/10 text-purple-500 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                            <Clock className="w-2.5 h-2.5" /> Odaklanma Sırasında
+                          </span>
+                        )}
+                      </div>
+                      <button onClick={() => handleDeleteDeepWorkEntry(entry.id)} className="text-app-muted hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <p className="text-xs text-app-secondary whitespace-pre-wrap">{entry.content}</p>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
       </div>
 
       {/* Attachments Section (Görev 15) */}

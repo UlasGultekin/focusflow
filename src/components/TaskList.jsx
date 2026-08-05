@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Plus,
   Search,
@@ -6,6 +6,10 @@ import {
   Circle,
   Clock,
   Filter,
+  Repeat,
+  ChevronDown,
+  ChevronRight,
+  Calendar,
 } from 'lucide-react';
 import { useTaskStore } from '../stores/useTaskStore';
 
@@ -23,10 +27,17 @@ export default function TaskList({ onOpenAddModal }) {
     updateTask,
   } = useTaskStore();
 
+  const [expandedGroups, setExpandedGroups] = useState({});
+
+  const toggleGroupExpand = (groupId) => {
+    setExpandedGroups((prev) => ({ ...prev, [groupId]: !prev[groupId] }));
+  };
+
   // Extract unique categories safely
   const categories = ['all', ...new Set(tasks.map((t) => t?.category).filter(Boolean))];
 
-  // Filter tasks safely by search and category
+  // Filter tasks safely by search, category, and date (hide future planned tasks from active view)
+  const todayStr = new Date().toISOString().slice(0, 10);
   const filteredTasks = tasks.filter((task) => {
     if (!task) return false;
     const titleStr = (task.title || '').toLowerCase();
@@ -36,8 +47,54 @@ export default function TaskList({ onOpenAddModal }) {
     const matchesSearch = titleStr.includes(queryStr) || descStr.includes(queryStr);
     const matchesCategory =
       !filterCategory || filterCategory === 'all' || task.category === filterCategory;
-    return matchesSearch && matchesCategory;
+
+    // If viewing active/todo tasks, hide future scheduled tasks (planned_date > todayStr)
+    const isFutureTask =
+      filterStatus !== 'all' &&
+      filterStatus !== 'completed' &&
+      task.planned_date &&
+      task.planned_date > todayStr;
+
+    return matchesSearch && matchesCategory && !isFutureTask;
   });
+
+  // Group recurring future tasks if in 'Tümü' tab to prevent list clutter
+  const renderList = [];
+  if (filterStatus === 'all') {
+    const normalTasks = [];
+    const recurringGroups = {}; // groupId -> array of tasks
+
+    filteredTasks.forEach((task) => {
+      const isFuture = task.planned_date && task.planned_date > todayStr;
+      if (isFuture && task.recurrence_group_id) {
+        if (!recurringGroups[task.recurrence_group_id]) {
+          recurringGroups[task.recurrence_group_id] = [];
+        }
+        recurringGroups[task.recurrence_group_id].push(task);
+      } else {
+        normalTasks.push({ type: 'single', task });
+      }
+    });
+
+    // Add normal tasks
+    renderList.push(...normalTasks);
+
+    // Add grouped recurring items
+    Object.entries(recurringGroups).forEach(([groupId, groupTasks]) => {
+      renderList.push({
+        type: 'group',
+        groupId,
+        title: groupTasks[0].title,
+        category: groupTasks[0].category,
+        count: groupTasks.length,
+        tasks: groupTasks,
+      });
+    });
+  } else {
+    filteredTasks.forEach((task) => {
+      renderList.push({ type: 'single', task });
+    });
+  }
 
   const handleToggleComplete = async (e, task) => {
     e.stopPropagation();
@@ -114,12 +171,72 @@ export default function TaskList({ onOpenAddModal }) {
 
       {/* Task List Items */}
       <div className="flex-1 overflow-y-auto p-3 space-y-2">
-        {filteredTasks.length === 0 ? (
+        {renderList.length === 0 ? (
           <div className="text-center py-8 px-4 text-app-muted text-xs">
             Görev bulunamadı.
           </div>
         ) : (
-          filteredTasks.map((task) => {
+          renderList.map((item, index) => {
+            if (item.type === 'group') {
+              const isExpanded = !!expandedGroups[item.groupId];
+              return (
+                <div key={'group-' + item.groupId} className="border border-app rounded-xl overflow-hidden bg-app-secondary/30">
+                  <div
+                    onClick={() => toggleGroupExpand(item.groupId)}
+                    className="p-2.5 flex items-center justify-between cursor-pointer hover:bg-app-surface-hover transition-colors"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="p-1 rounded-md bg-app-accent-light text-app-accent">
+                        <Repeat className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="truncate">
+                        <div className="font-semibold text-xs text-app-primary truncate">
+                          {item.title} <span className="text-[10px] text-app-muted font-normal">(Periyot)</span>
+                        </div>
+                        <div className="text-[10px] text-app-muted">
+                          {item.count} Gelecek Tekrar
+                        </div>
+                      </div>
+                    </div>
+                    {isExpanded ? (
+                      <ChevronDown className="w-4 h-4 text-app-muted shrink-0" />
+                    ) : (
+                      <ChevronRight className="w-4 h-4 text-app-muted shrink-0" />
+                    )}
+                  </div>
+
+                  {isExpanded && (
+                    <div className="p-2 pt-0 space-y-1.5 border-t border-app/50 bg-app-primary/50">
+                      {item.tasks.map((task) => {
+                        const isSelected = selectedTaskId === task.id;
+                        const isCompleted = task.status === 'completed' || task.status === 'done';
+                        return (
+                          <div
+                            key={task.id}
+                            onClick={() => selectTask(task.id)}
+                            className={`p-2 rounded-lg border transition-all cursor-pointer relative ${
+                              isSelected
+                                ? 'border-app-accent bg-app-accent-light shadow-xs'
+                                : 'border-app bg-app-surface hover:border-app-accent/50'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between text-[10px]">
+                              <span className="font-medium text-app-primary flex items-center gap-1">
+                                <Calendar className="w-3 h-3 text-app-accent" />
+                                {task.planned_date}
+                              </span>
+                              <span className="text-app-muted">{task.planned_start_time || '10:00'}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
+            const { task } = item;
             const isSelected = selectedTaskId === task.id;
             const isCompleted = task.status === 'completed' || task.status === 'done';
 
@@ -164,6 +281,12 @@ export default function TaskList({ onOpenAddModal }) {
                       <span className="bg-app-secondary px-1.5 py-0.5 rounded-md text-app-secondary">
                         {task.category || 'Genel'}
                       </span>
+                      {task.planned_date && (
+                        <span className="flex items-center gap-1 text-app-accent font-semibold">
+                          <Calendar className="w-3 h-3" />
+                          {task.planned_date}
+                        </span>
+                      )}
                       <span className="flex items-center gap-1">
                         <Clock className="w-3 h-3" />
                         {task.estimated_minutes || 25}dk

@@ -68,6 +68,8 @@ function ImageStrip({ images, onRemove, onOpen }) {
 export default function BugsView() {
   const { bugs, fetchBugs, addBug, deleteBug, updateBug, convertToTask } = useBugStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingBug, setEditingBug] = useState(null);
+  
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [severity, setSeverity] = useState('minor');
@@ -144,11 +146,11 @@ export default function BugsView() {
     }
   };
 
-  const handleAddBug = async (e) => {
+  const handleSaveBug = async (e) => {
     e.preventDefault();
     if (!title.trim()) return;
 
-    await addBug({
+    const data = {
       title,
       description,
       severity,
@@ -158,9 +160,16 @@ export default function BugsView() {
       images_json: JSON.stringify(images),
       attachments_json: JSON.stringify(attachments),
       project
-    });
+    };
+
+    if (editingBug) {
+      await updateBug(editingBug.id, data);
+    } else {
+      await addBug(data);
+    }
 
     setIsModalOpen(false);
+    setEditingBug(null);
     setTitle('');
     setDescription('');
     setSeverity('minor');
@@ -170,6 +179,34 @@ export default function BugsView() {
     setImages([]);
     setAttachments([]);
     setProject('Genel');
+  };
+
+  const openEditModal = (bug) => {
+    setEditingBug(bug);
+    setTitle(bug.title || '');
+    setDescription(bug.description || '');
+    setSeverity(bug.severity || 'minor');
+    setReproductionSteps(bug.reproduction_steps || '');
+    setEnvironment(bug.environment || '');
+    setPlannedDate(bug.planned_date || '');
+    setImages(parseJsonField(bug.images_json));
+    setAttachments(parseJsonField(bug.attachments_json));
+    setProject(bug.project || 'Genel');
+    setIsModalOpen(true);
+  };
+
+  const openAddModal = () => {
+    setEditingBug(null);
+    setTitle('');
+    setDescription('');
+    setSeverity('minor');
+    setReproductionSteps('');
+    setEnvironment('');
+    setPlannedDate('');
+    setImages([]);
+    setAttachments([]);
+    setProject('Genel');
+    setIsModalOpen(true);
   };
 
   const filteredBugs = projectFilter === 'all' 
@@ -202,7 +239,7 @@ export default function BugsView() {
           </select>
 
           <button
-            onClick={() => setIsModalOpen(true)}
+            onClick={openAddModal}
             className="bg-app-primary text-app-primary border border-app hover:border-app-accent px-4 py-2 rounded-xl text-sm font-semibold transition-all flex items-center gap-2"
           >
             <Plus className="w-4 h-4" /> Yeni Bug Bildir
@@ -274,6 +311,9 @@ export default function BugsView() {
                         <ArrowRight className="w-3 h-3" /> Göreve Dönüştür
                       </button>
                     )}
+                    <button onClick={() => openEditModal(bug)} className="p-1.5 text-app-muted hover:text-indigo-500 transition-colors">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-edit-3"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                    </button>
                     <button onClick={() => deleteBug(bug.id)} className="p-1.5 text-app-muted hover:text-rose-500 transition-colors">
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -288,8 +328,8 @@ export default function BugsView() {
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-app-surface w-full max-w-lg rounded-2xl border border-app shadow-2xl p-6" onDrop={handleDrop} onDragOver={e => e.preventDefault()}>
-            <h2 className="text-lg font-bold mb-4">Yeni Bug Bildir</h2>
-            <form onSubmit={handleAddBug} className="space-y-4">
+            <h2 className="text-lg font-bold mb-4">{editingBug ? 'Bug Düzenle' : 'Yeni Bug Bildir'}</h2>
+            <form onSubmit={handleSaveBug} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-app-secondary mb-1">Başlık</label>
                 <input required value={title} onChange={(e) => setTitle(e.target.value)} className="w-full bg-app-bg border border-app rounded-xl px-3 py-2 text-sm outline-hidden focus:border-rose-500" />

@@ -26,6 +26,14 @@ export const useLinkStore = create((set, get) => ({
     }
   },
 
+  addBatchLinks: async (linksArray) => {
+    if (window.electronAPI && window.electronAPI.addBatchLinks) {
+      const result = await window.electronAPI.addBatchLinks(linksArray);
+      await get().fetchLinks();
+      return result;
+    }
+  },
+
   updateLink: async (id, linkData) => {
     if (window.electronAPI) {
       await window.electronAPI.updateLink(id, linkData);

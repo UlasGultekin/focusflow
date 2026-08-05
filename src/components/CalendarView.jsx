@@ -12,6 +12,8 @@ import {
   StickyNote,
   Bug,
   Wrench,
+  Trash2,
+  Repeat,
 } from 'lucide-react';
 import { useTaskStore } from '../stores/useTaskStore';
 import { useBugStore } from '../stores/useBugStore';
@@ -20,10 +22,11 @@ import {
   format,
   addDays,
   subDays,
-  startOfWeek,
-  endOfWeek,
-  eachDayOfInterval,
-  isSameDay,
+  addMonths,
+  addYears,
+  isBefore,
+  isEqual,
+  getDay,
   parseISO,
 } from 'date-fns';
 import { tr } from 'date-fns/locale';
@@ -31,7 +34,7 @@ import { tr } from 'date-fns/locale';
 const HOURS = Array.from({ length: 17 }, (_, i) => i + 7); // 07:00 to 23:00
 
 export default function CalendarView() {
-  const { tasks, addTask, updateTask, allNotes, fetchAllNotes } = useTaskStore();
+  const { tasks, addTask, updateTask, deleteTask, deleteRecurringGroup, allNotes, fetchAllNotes } = useTaskStore();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
   const [planTitle, setPlanTitle] = useState('');
@@ -39,6 +42,15 @@ export default function CalendarView() {
   const [planTime, setPlanTime] = useState('10:00');
   const [planDuration, setPlanDuration] = useState(60);
   const [planType, setPlanType] = useState('task'); // 'task' | 'event'
+
+  // Recurrence States
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurrencePattern, setRecurrencePattern] = useState('daily'); // 'daily' | 'weekdays' | 'custom_days'
+  const [selectedDays, setSelectedDays] = useState([1, 2, 3, 4, 5]); // 1: Mon, 2: Tue, ..., 0: Sun
+  const [durationPeriod, setDurationPeriod] = useState('1_month'); // '1_month' | '3_months' | '6_months' | '1_year'
+
+  // Item Details / Delete Modal State
+  const [selectedTaskDetail, setSelectedTaskDetail] = useState(null);
 
   const selectedDateStr = format(selectedDate, 'yyyy-MM-dd');
 
@@ -66,38 +78,89 @@ export default function CalendarView() {
   // Unplanned tasks
   const unplannedTasks = tasks.filter((t) => !t.planned_date && t.status !== 'done');
 
-  // Check for time overlap
-  const timeCounts = {};
-  dayTasks.forEach((t) => {
-    if (t.planned_start_time) {
-      const hour = parseInt(t.planned_start_time.split(':')[0], 10);
-      timeCounts[hour] = (timeCounts[hour] || 0) + 1;
+  const toggleDaySelection = (dayIndex) => {
+    if (selectedDays.includes(dayIndex)) {
+      if (selectedDays.length === 1) return; // En az 1 gün seçili kalmalı
+      setSelectedDays(selectedDays.filter((d) => d !== dayIndex));
+    } else {
+      setSelectedDays([...selectedDays, dayIndex]);
     }
-  });
-  dayNotes.forEach((n) => {
-    if (n.planned_start_time) {
-      const hour = parseInt(n.planned_start_time.split(':')[0], 10);
-      timeCounts[hour] = (timeCounts[hour] || 0) + 1;
+  };
+
+  const calculateTargetDates = () => {
+    const dates = [];
+    const startDate = parseISO(selectedDateStr);
+    let endDate = addMonths(startDate, 1);
+
+    if (durationPeriod === '3_months') endDate = addMonths(startDate, 3);
+    else if (durationPeriod === '6_months') endDate = addMonths(startDate, 6);
+    else if (durationPeriod === '1_year') endDate = addYears(startDate, 1);
+
+    let curr = startDate;
+
+    while (isBefore(curr, endDate) || isEqual(curr, endDate)) {
+      const dayOfWeek = getDay(curr); // 0 = Sun, 1 = Mon, ..., 6 = Sat
+
+      let match = false;
+      if (recurrencePattern === 'daily') {
+        match = true;
+      } else if (recurrencePattern === 'weekdays') {
+        if (dayOfWeek >= 1 && dayOfWeek <= 5) match = true;
+      } else if (recurrencePattern === 'custom_days') {
+        if (selectedDays.includes(dayOfWeek)) match = true;
+      }
+
+      if (match) {
+        dates.push(format(curr, 'yyyy-MM-dd'));
+      }
+      curr = addDays(curr, 1);
     }
-  });
+    return dates;
+  };
 
   const handleCreatePlan = async (e) => {
     e.preventDefault();
     if (!planTitle.trim()) return;
 
-    await addTask({
-      title: planTitle.trim(),
-      category: planCategory.trim() || 'Plan',
-      estimated_minutes: parseInt(planDuration, 10) || 60,
-      planned_date: selectedDateStr,
-      planned_start_time: planTime,
-      task_type: planType,
-      status: 'todo',
-      color: planType === 'event' ? '#FB7185' : '#5B8DEF',
-    });
+    if (!isRecurring) {
+      await addTask({
+        title: planTitle.trim(),
+        category: planCategory.trim() || 'Plan',
+        estimated_minutes: parseInt(planDuration, 10) || 60,
+        planned_date: selectedDateStr,
+        planned_start_time: planTime,
+        task_type: planType,
+        status: 'todo',
+        color: planType === 'event' ? '#FB7185' : '#5B8DEF',
+      });
+    } else {
+      const dates = calculateTargetDates();
+      const groupId = 'rec_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+      const ruleJson = JSON.stringify({
+        pattern: recurrencePattern,
+        selectedDays,
+        durationPeriod,
+      });
+
+      for (const dStr of dates) {
+        await addTask({
+          title: planTitle.trim(),
+          category: planCategory.trim() || 'Plan',
+          estimated_minutes: parseInt(planDuration, 10) || 60,
+          planned_date: dStr,
+          planned_start_time: planTime,
+          task_type: planType,
+          status: 'todo',
+          color: planType === 'event' ? '#FB7185' : '#5B8DEF',
+          recurrence_group_id: groupId,
+          recurrence_rule: ruleJson,
+        });
+      }
+    }
 
     setIsPlanModalOpen(false);
     setPlanTitle('');
+    setIsRecurring(false);
   };
 
   const handleAssignToDate = async (task, time = '12:00') => {
@@ -106,6 +169,26 @@ export default function CalendarView() {
       planned_start_time: time,
     });
   };
+
+  const handleDeleteSingleTask = async (taskId) => {
+    await deleteTask(taskId);
+    setSelectedTaskDetail(null);
+  };
+
+  const handleDeleteTaskGroup = async (groupId) => {
+    await deleteRecurringGroup(groupId);
+    setSelectedTaskDetail(null);
+  };
+
+  const daysOfWeekLabels = [
+    { label: 'Pzt', value: 1 },
+    { label: 'Sal', value: 2 },
+    { label: 'Çar', value: 3 },
+    { label: 'Per', value: 4 },
+    { label: 'Cum', value: 5 },
+    { label: 'Cmt', value: 6 },
+    { label: 'Paz', value: 0 },
+  ];
 
   return (
     <div className="flex-1 flex flex-col h-screen bg-app-primary overflow-y-auto select-none">
@@ -118,7 +201,7 @@ export default function CalendarView() {
           <div>
             <h2 className="text-xl font-bold text-app-primary">Dahili Takvim & Planlayıcı</h2>
             <p className="text-xs text-app-secondary">
-              Gününüzü saatlik zaman çizelgesinde planlayın, çakışmaları görün
+              Gününüzü saatlik zaman çizelgesinde planlayın, çakışmaları görün ve tekrarlayan periyotlar ekleyin
             </p>
           </div>
         </div>
@@ -201,7 +284,7 @@ export default function CalendarView() {
           <div className="space-y-2">
             {HOURS.map((hour) => {
               const hourStr = `${hour.toString().padStart(2, '0')}:00`;
-              
+
               const tasksForHour = dayTasks.filter((t) => {
                 if (!t.planned_start_time) return false;
                 const h = parseInt(t.planned_start_time.split(':')[0], 10);
@@ -214,23 +297,6 @@ export default function CalendarView() {
                 return h === hour;
               });
 
-              const bugsForHour = dayBugs.filter((b) => {
-                // bugs may not have planned_start_time, but if they do:
-                if (!b.planned_start_time) return false;
-                const h = parseInt(b.planned_start_time.split(':')[0], 10);
-                return h === hour;
-              });
-
-              const techDebtsForHour = dayTechDebts.filter((td) => {
-                if (!td.planned_start_time) return false;
-                const h = parseInt(td.planned_start_time.split(':')[0], 10);
-                return h === hour;
-              });
-
-              // Also match items without a specific hour to 10:00 as fallback (just for visual representation if planned_start_time is missing but planned_date exists, wait no, let's keep it simple)
-              // Actually in Bug and TechDebt creation, we didn't add planned_start_time. So they might not appear here! 
-              // Wait, I didn't add planned_start_time to Bug and TechDebt tables!
-              // Let's just put all of them at 10:00 if they don't have start_time.
               dayBugs.forEach(b => { if (!b.planned_start_time) b.planned_start_time = '10:00'; });
               dayTechDebts.forEach(td => { if (!td.planned_start_time) td.planned_start_time = '10:00'; });
 
@@ -272,11 +338,15 @@ export default function CalendarView() {
                         {tasksForHour.map((task) => (
                           <div
                             key={'t-' + task.id}
-                            className="px-3 py-2 rounded-xl text-xs font-semibold text-white shadow-xs flex items-center gap-2"
+                            onClick={() => setSelectedTaskDetail(task)}
+                            className="px-3 py-2 rounded-xl text-xs font-semibold text-white shadow-xs flex items-center gap-2 cursor-pointer hover:opacity-90 transition-opacity"
                             style={{ backgroundColor: task.color || '#5B8DEF' }}
                           >
                             <Clock className="w-3.5 h-3.5" />
                             <span>{task.title}</span>
+                            {task.recurrence_group_id && (
+                              <Repeat className="w-3 h-3 text-white/80" title="Tekrarlayan Etkinlik" />
+                            )}
                             <span className="text-[10px] opacity-80">({task.estimated_minutes}dk)</span>
                           </div>
                         ))}
@@ -320,10 +390,60 @@ export default function CalendarView() {
         </div>
       </div>
 
-      {/* Plan Modal */}
+      {/* Detail / Delete Modal */}
+      {selectedTaskDetail && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-app-surface border border-app rounded-2xl w-full max-w-sm p-5 shadow-xl space-y-4">
+            <div className="flex items-center justify-between border-b border-app pb-3">
+              <h3 className="font-bold text-sm text-app-primary flex items-center gap-2">
+                <Clock className="w-4 h-4 text-app-accent" /> {selectedTaskDetail.title}
+              </h3>
+              {selectedTaskDetail.recurrence_group_id && (
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-app-accent-light text-app-accent flex items-center gap-1">
+                  <Repeat className="w-3 h-3" /> Tekrarlayan
+                </span>
+              )}
+            </div>
+
+            <div className="text-xs text-app-secondary space-y-1">
+              <p><strong>Tarih:</strong> {selectedTaskDetail.planned_date}</p>
+              <p><strong>Saat:</strong> {selectedTaskDetail.planned_start_time || '10:00'}</p>
+              <p><strong>Süre:</strong> {selectedTaskDetail.estimated_minutes} dakika</p>
+              <p><strong>Kategori:</strong> {selectedTaskDetail.category}</p>
+            </div>
+
+            <div className="pt-3 border-t border-app space-y-2">
+              <button
+                onClick={() => handleDeleteSingleTask(selectedTaskDetail.id)}
+                className="w-full py-2 px-3 rounded-xl border border-rose-500/30 text-rose-500 hover:bg-rose-500/10 font-semibold text-xs transition-all flex items-center justify-center gap-2"
+              >
+                <Trash2 className="w-4 h-4" /> Sadece Bu Etkinliği Sil
+              </button>
+
+              {selectedTaskDetail.recurrence_group_id && (
+                <button
+                  onClick={() => handleDeleteTaskGroup(selectedTaskDetail.recurrence_group_id)}
+                  className="w-full py-2 px-3 rounded-xl bg-rose-500 text-white hover:opacity-90 font-semibold text-xs transition-all flex items-center justify-center gap-2 shadow-xs"
+                >
+                  <Repeat className="w-4 h-4" /> Tüm Periyodu (Grubu) Sil
+                </button>
+              )}
+
+              <button
+                onClick={() => setSelectedTaskDetail(null)}
+                className="w-full py-2 px-3 rounded-xl border border-app text-app-secondary text-xs"
+              >
+                Kapat
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Plan / Event Creation Modal */}
       {isPlanModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-app-surface border border-app rounded-2xl w-full max-w-md p-5 shadow-xl space-y-4">
+          <div className="bg-app-surface border border-app rounded-2xl w-full max-w-md p-5 shadow-xl space-y-4 max-h-[90vh] overflow-y-auto">
             <h3 className="font-bold text-base text-app-primary">
               Yeni Etkinlik / Plan Ekle ({selectedDateStr})
             </h3>
@@ -336,7 +456,7 @@ export default function CalendarView() {
                   required
                   value={planTitle}
                   onChange={(e) => setPlanTitle(e.target.value)}
-                  placeholder="Örn: Müşteri Görüşmesi"
+                  placeholder="Örn: Müşteri Görüşmesi veya Daily Standup"
                   className="w-full px-3 py-2 rounded-xl border border-app bg-app-primary text-app-primary text-xs focus:outline-none focus:ring-1 focus:ring-app-accent"
                 />
               </div>
@@ -364,6 +484,77 @@ export default function CalendarView() {
                 </div>
               </div>
 
+              {/* Recurrence Toggle */}
+              <div className="pt-2 border-t border-app space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-app-primary flex items-center gap-2">
+                    <Repeat className="w-4 h-4 text-app-accent" /> Periyodik / Tekrarlayan Giriş Yap
+                  </label>
+                  <input
+                    type="checkbox"
+                    checked={isRecurring}
+                    onChange={(e) => setIsRecurring(e.target.checked)}
+                    className="w-4 h-4 rounded border-app text-app-accent focus:ring-app-accent cursor-pointer"
+                  />
+                </div>
+
+                {isRecurring && (
+                  <div className="p-3 bg-app-secondary rounded-xl space-y-3 border border-app">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-app-secondary mb-1">Tekrar Düzeni</label>
+                      <select
+                        value={recurrencePattern}
+                        onChange={(e) => setRecurrencePattern(e.target.value)}
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-app bg-app-primary text-app-primary text-xs focus:outline-none"
+                      >
+                        <option value="daily">Her Gün (Daily)</option>
+                        <option value="weekdays">Hafta İçi Her Gün (Pzt-Cum)</option>
+                        <option value="custom_days">Haftanın Belirli Günleri</option>
+                      </select>
+                    </div>
+
+                    {recurrencePattern === 'custom_days' && (
+                      <div>
+                        <label className="block text-[11px] font-semibold text-app-secondary mb-1">Günleri Seçin</label>
+                        <div className="flex items-center gap-1">
+                          {daysOfWeekLabels.map((d) => {
+                            const isSelected = selectedDays.includes(d.value);
+                            return (
+                              <button
+                                key={d.value}
+                                type="button"
+                                onClick={() => toggleDaySelection(d.value)}
+                                className={`flex-1 py-1 text-[10px] font-bold rounded-md border transition-all ${
+                                  isSelected
+                                    ? 'bg-app-accent text-white border-app-accent'
+                                    : 'bg-app-primary text-app-muted border-app hover:text-app-primary'
+                                }`}
+                              >
+                                {d.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-app-secondary mb-1">Ne Kadar Süre Devam Etse?</label>
+                      <select
+                        value={durationPeriod}
+                        onChange={(e) => setDurationPeriod(e.target.value)}
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-app bg-app-primary text-app-primary text-xs focus:outline-none"
+                      >
+                        <option value="1_month">1 Ay Süresince</option>
+                        <option value="3_months">3 Ay Süresince</option>
+                        <option value="6_months">6 Ay Süresince</option>
+                        <option value="1_year">1 Yıl Süresince</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-app">
                 <button
                   type="button"
@@ -374,9 +565,9 @@ export default function CalendarView() {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-xl bg-app-accent text-white font-semibold text-xs"
+                  className="px-4 py-2 rounded-xl bg-app-accent text-white font-semibold text-xs hover:opacity-90 shadow-xs"
                 >
-                  Planla
+                  {isRecurring ? 'Periyodu Planla' : 'Planla'}
                 </button>
               </div>
             </form>

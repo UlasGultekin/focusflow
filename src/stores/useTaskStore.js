@@ -85,6 +85,13 @@ export const useTaskStore = create((set, get) => ({
     }
   },
 
+  deleteRecurringGroup: async (groupId) => {
+    if (window.electronAPI && window.electronAPI.deleteRecurringGroup) {
+      await window.electronAPI.deleteRecurringGroup(groupId);
+      await get().fetchTasks();
+    }
+  },
+
   // SUBTASKS (Görev 18)
   fetchSubtasks: async (taskId) => {
     if (window.electronAPI && window.electronAPI.getSubtasks) {

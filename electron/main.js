@@ -8,6 +8,7 @@ import {
   addTask,
   updateTask,
   deleteTask,
+  deleteRecurringGroup,
   getSubtasks,
   addSubtask,
   updateSubtask,
@@ -37,6 +38,7 @@ import {
   endCourseSession,
   getLinks,
   addLink,
+  addBatchLinks,
   deleteLink,
   updateLink,
   getTaskAttachments,
@@ -65,7 +67,12 @@ import {
   getBugs,
   addBug,
   updateBug,
-  deleteBug
+  deleteBug,
+  getDeepWorkEntries,
+  addDeepWorkEntry,
+  updateDeepWorkEntry,
+  deleteDeepWorkEntry,
+  generateStandupReport
 } from './database.js';
 
 const { app, BrowserWindow, ipcMain, Tray, Menu, globalShortcut, Notification, dialog, nativeImage, shell } = electron;
@@ -224,6 +231,7 @@ function setupIPCHandlers() {
   ipcMain.handle('tasks:add', (_, taskData) => addTask(taskData));
   ipcMain.handle('tasks:update', (_, id, taskData) => updateTask(id, taskData));
   ipcMain.handle('tasks:delete', (_, id) => deleteTask(id));
+  ipcMain.handle('tasks:deleteGroup', (_, groupId) => deleteRecurringGroup(groupId));
 
   // Subtasks (Görev 18)
   ipcMain.handle('subtasks:get', (_, taskId) => getSubtasks(taskId));
@@ -269,6 +277,7 @@ function setupIPCHandlers() {
   // Links
   ipcMain.handle('links:get', () => getLinks());
   ipcMain.handle('links:add', (_, linkData) => addLink(linkData));
+  ipcMain.handle('links:addBatch', (_, linksArray) => addBatchLinks(linksArray));
   ipcMain.handle('links:update', (_, id, linkData) => updateLink(id, linkData));
   ipcMain.handle('links:delete', (_, id) => deleteLink(id));
 
@@ -283,6 +292,15 @@ function setupIPCHandlers() {
   ipcMain.handle('bugs:add', (_, data) => addBug(data));
   ipcMain.handle('bugs:update', (_, id, data) => updateBug(id, data));
   ipcMain.handle('bugs:delete', (_, id) => deleteBug(id));
+
+  // Deep Work (Görev 28)
+  ipcMain.handle('deepwork:get', (_, taskId) => getDeepWorkEntries(taskId));
+  ipcMain.handle('deepwork:add', (_, taskId, sessionId, content) => addDeepWorkEntry(taskId, sessionId, content));
+  ipcMain.handle('deepwork:update', (_, id, content) => updateDeepWorkEntry(id, content));
+  ipcMain.handle('deepwork:delete', (_, id) => deleteDeepWorkEntry(id));
+
+  // Stand-up Report (Görev 27)
+  ipcMain.handle('standup:generate', (_, dateStr) => generateStandupReport(dateStr));
 
   // Attachments (Görev 15)
   ipcMain.handle('attachments:get', (_, taskId) => getTaskAttachments(taskId));

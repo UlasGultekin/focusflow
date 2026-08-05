@@ -38,8 +38,15 @@ export default function BoardView({ onOpenAddModal }) {
     }
   };
 
+  const todayStr = new Date().toISOString().slice(0, 10);
+
   const getColumnTasks = (status) => {
-    return tasks.filter((t) => (t.status || 'todo') === status);
+    return tasks.filter((t) => {
+      const matchStatus = (t.status || 'todo') === status;
+      // Filter out future planned tasks (planned_date > todayStr) so Kanban Todo doesn't overflow with future recurring tasks
+      const isFutureTask = t.planned_date && t.planned_date > todayStr;
+      return matchStatus && !isFutureTask;
+    });
   };
 
   const handleMoveStatus = async (taskId, newStatus) => {

@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { useSettingsStore, DEFAULT_MENU_LABELS } from '../stores/useSettingsStore';
 
-export default function Sidebar({ currentTab, setCurrentTab }) {
+export default function Sidebar({ currentTab, setCurrentTab, onOpenStandup }) {
   const { theme, setTheme, compactMode, menuLabels, setMenuLabel, resetMenuLabels, hiddenTabs } = useSettingsStore();
 
   const [editingId, setEditingId] = useState(null);
@@ -155,6 +155,18 @@ export default function Sidebar({ currentTab, setCurrentTab }) {
           );
         })}
       </nav>
+
+      {/* Tools Section */}
+      <div className="p-3 border-t border-app">
+        <button
+          onClick={onOpenStandup}
+          className={`w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-bold text-white bg-indigo-500 hover:bg-indigo-600 transition-colors shadow-sm`}
+          title="Günlük Stand-up"
+        >
+          <LayoutList className="w-4 h-4" />
+          {!compactMode && <span>Stand-up Raporu</span>}
+        </button>
+      </div>
 
       {/* Quick Theme Switcher at bottom */}
       <div className="p-3 border-t border-app">

@@ -1,127 +1,134 @@
-Mevcut yapıyı tamamen koruyarak, istediğin ayrımı sağlayacak bir mimari güncellemesi öneriyorum. Temel prensip: **Bug, Teknik Borç, Snippet gibi varlıklar kendi tablolarında yaşar; görev ya da takvim öğesi olmaları isteğe bağlıdır.** Yani hiçbir şey otomatik olarak görev panosuna düşmez; yalnızca sen “Görev olarak ata” dediğinde göreve dönüşür.
+İşte istediğin iki özelliğin, mevcut FocusFlow mimarisine tam uyumlu, adım adım uygulayabileceğin detaylı görev kartları:
 
 ---
 
-## 🔄 Mimari Revizyon Özeti
+## Görev 27: Günlük Stand-up Not Asistanı
 
-| Varlık | Kendi Tablosu | Görev Olarak Atanabilir mi? | Takvime Eklenebilir mi? |
-|--------|---------------|----------------------------|--------------------------|
-| Görev | `tasks` | *(zaten görev)* | Evet, `planned_date` ile |
-| Teknik Borç | `tech_debts` | ✅ “Göreve Dönüştür” butonu | ✅ `planned_date` ile (kendi alanı) |
-| Bug | `bugs` | ✅ “Göreve Dönüştür” butonu | ✅ `planned_date` ile (kendi alanı) |
-| Kod Snippet | `code_snippets` | ❌ (görevle ilişkilendirilebilir) | ❌ |
-| Derin Çalışma Girişi | `deep_work_entries` | ❌ (göreve bağlı) | ❌ |
+**Amaç:** Her sabah, “Dün ne yaptım? Bugün ne yapacağım? Engeller neler?” formatındaki stand-up raporunu, uygulamada biriken verilerden yarı otomatik olarak oluşturmak. Raporu panoya kopyalamak, günlüğe kaydetmek veya farklı formatlarda dışarı aktarmak.
 
-- **Görevler** hâlâ `tasks` tablosunda. Board, Todo/In Progress/Done yalnızca `tasks` üzerinde çalışır.
-- **Bug ve Teknik Borç** kendi özel tablolarında tutulur. Onları yönettiğin ayrı paneller vardır (Dashboard widget’ları veya özel sayfalar).
-- Bir Bug veya Teknik Borcu **“Göreve Dönüştür”** dediğinde, `tasks` tablosuna bir kopya oluşturulur ve aralarında bağlantı (`task_id` referansı) kurulur. Böylece board’a düşer.
-- Takvim yalnızca `planned_date` içeren kayıtları gösterir. Bug ve Teknik Borç tablolarına da `planned_date` eklenir, böylece onları isteğe bağlı takvime yerleştirebilirsin.
+**Temel Mantık:** Yeni bir tablo gerekmez; mevcut `tasks`, `task_sessions`, `task_links` ve takvim verileri salt okunur şekilde taranır. IPC’de özel bir fonksiyon bu veriyi birleştirip yapılandırılmış metin olarak döndürür.
 
----
+### 27.1 IPC Metodu
 
-## Görev 27: Merkezi Olmayan Varlık Yönetimi ve İsteğe Bağlı Bağlama
+`generateStandupReport(date?: string)` (date varsayılan bugün)
 
-**Amaç:** Teknik Borç, Bug, Snippet gibi özel varlıkların görevlerden bağımsız olarak kendi tablolarında yönetilmesi; yalnızca kullanıcı istediğinde göreve dönüştürülmesi veya takvime eklenmesi.
+**İşleyiş:**
 
-### 27.1 Veritabanı Revizyonu
+- **Dün:** `tasks` tablosunda `status = 'done'` ve `updated_at` tarihi dün olan görevler getirilir. Her görevin başlığı, harcanan süre (task_sessions toplamı) ve varsa etiketleri alınır.
+- **Bugün:** `tasks` tablosunda `planned_date` bugün olan veya `status = 'in_progress'` olan görevler bulunur. Takvimde planlanmış saatleri varsa gösterilir.
+- **Engeller:** `task_links` tablosunda `link_type = 'blocks'` olan ve hedef görevin (`target_task_id`) `status != 'done'` olduğu kayıtlar taranır. Kaynak görevin başlığı ve engel olan görevin başlığı listelenir.
+- Hiçbir veri yoksa “Dün tamamlanan görev yok”, “Bugün için planlanan yok” gibi placeholder cümleler eklenir.
 
-Aşağıdaki tablolar **Görev 21 ve 23’ün yerine geçecek** şekilde oluşturulur:
-
-```sql
--- Teknik Borçlar (tasks'tan bağımsız)
-CREATE TABLE IF NOT EXISTS tech_debts (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  title TEXT NOT NULL,
-  description TEXT,
-  category TEXT DEFAULT 'refactor',  -- refactor, performance, security, cleanup, documentation
-  estimated_minutes INTEGER,
-  status TEXT DEFAULT 'open',        -- open, in_progress, resolved, archived
-  priority TEXT DEFAULT 'medium',    -- low, medium, high, critical
-  planned_date TEXT,                 -- isteğe bağlı takvim planlaması
-  task_id INTEGER,                   -- dönüştürüldüğünde bağlanacak görev ID'si
-  created_at TEXT DEFAULT (datetime('now')),
-  updated_at TEXT DEFAULT (datetime('now')),
-  FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL
-);
-
--- Bug'lar (tasks'tan bağımsız)
-CREATE TABLE IF NOT EXISTS bugs (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  title TEXT NOT NULL,
-  description TEXT,
-  severity TEXT DEFAULT 'minor',     -- critical, major, minor, trivial
-  reproduction_steps TEXT,
-  environment TEXT,
-  status TEXT DEFAULT 'open',        -- open, in_progress, resolved, closed
-  priority TEXT DEFAULT 'medium',
-  planned_date TEXT,                 -- isteğe bağlı takvim planlaması
-  fix_commit TEXT,
-  task_id INTEGER,                   -- dönüştürüldüğünde bağlanacak görev ID'si
-  created_at TEXT DEFAULT (datetime('now')),
-  updated_at TEXT DEFAULT (datetime('now')),
-  FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL
-);
+**Dönüş formatı (renderer'a uygun obje):**
+```json
+{
+  "yesterday": [
+    { "id": 45, "title": "Kullanıcı girişi refactor", "duration_minutes": 150 }
+  ],
+  "today": [
+    { "id": 47, "title": "Dashboard tasarımı", "planned_start": "09:00", "planned_end": "11:00" },
+    { "id": 48, "title": "API entegrasyonu" }
+  ],
+  "blockers": [
+    { "task_id": 49, "task_title": "Ödeme modülü", "blocker_task_id": 32, "blocker_title": "SSL sertifikası yenileme" }
+  ],
+  "suggested_text": "**Dün:** ... \n**Bugün:** ... \n**Engeller:** ..."
+}
 ```
 
-**Not:** `code_snippets` ve `deep_work_entries` tabloları aynen kalır, onlar zaten görevle ilişkilendirilebilir yapıdadır.
+`suggested_text` doğrudan düzenlenebilir bir metin olarak hazır gelir (kullanıcı değiştirebilir). Format, ayarlardan seçilen tercihe göre **düz metin**, **Slack Markdown** veya **Microsoft Teams HTML** olabilir.
 
-### 27.2 IPC Metodları (Yeni ve Güncellenen)
+### 27.2 Arayüz Gereksinimleri
 
-**Teknik Borç:**
-- `addTechDebt(data)` → Yeni borç ekler.
-- `updateTechDebt(id, data)` → Günceller.
-- `deleteTechDebt(id)` → Siler.
-- `convertTechDebtToTask(techDebtId)` → **Göreve dönüştürme**:
-  - `tech_debts` kaydını okur.
-  - `tasks` tablosuna yeni bir görev ekler (`task_type: 'tech_debt'`, başlık, açıklama, tahmini süre vb. kopyalanır).
-  - `tech_debts` kaydının `task_id` alanını yeni görevin ID’si ile günceller.
-  - Oluşan görev ID’sini döndürür.
-- `getTechDebts(filters?)` → Liste. Filtreler: status, category, priority, planned_date aralığı.
+**Erişim noktaları:**
+- Dashboard’da “Stand-up Raporu Oluştur” butonu (widget olarak veya genel eylem butonu).
+- Ana menü → “Araçlar” altına “Günlük Stand-up” seçeneği.
+- Global kısayol: `Ctrl+Shift+U` (öneri).
 
-**Bug:**
-- `addBug(data)`, `updateBug(id, data)`, `deleteBug(id)`.
-- `convertBugToTask(bugId)` → Yukarıdakiyle aynı mantık, `task_type: 'bug'`.
-- `getBugs(filters?)`.
+**Modal pencere:**
+- Butona tıklandığında ekranın ortasında büyükçe bir modal açılır.
+- Üst kısımda **tarih seçici** (varsayılan bugün), yanında “Dün”, “Bugün” hızlı butonları.
+- Ana alan, `suggested_text` ile doldurulmuş, düzenlenebilir bir `<textarea>` (en az 10 satır yüksekliğinde, monospace font).
+- Kullanıcı metni serbestçe değiştirebilir.
+- Alt kısımda butonlar:
+  - **“Panoya Kopyala”**: Metni panoya alır, ufak bir “Kopyalandı” toast bildirimi gösterir. Kopyalama formatı ayarlarda seçili olan formata uygun olur.
+  - **“Günlüğe Kaydet”**: Bugünün tarihine ait günlük girişine (`journal_entries`) metni ekler (varsa var olanın sonuna ekler, yoksa yeni oluşturur). Ardından Günlük sekmesine yönlendirme opsiyonu.
+  - **“Yeniden Üret”**: Filtrelere göre metni tekrar oluşturur.
+  - **“Kapat”**: Değişiklikleri kaydetmeden modalı kapatır.
 
-**Takvim Entegrasyonu için Ortak Metot:**
-- `getCalendarItems(startDate, endDate)` → Birleştirilmiş liste döndürür:
-  - `tasks` tablosundan `planned_date` dolu olan ve verilen aralıktaki görevler.
-  - `tech_debts` tablosundan `planned_date` dolu kayıtlar.
-  - `bugs` tablosundan `planned_date` dolu kayıtlar.
-  - Her kayıt `{ type: 'task'|'tech_debt'|'bug', id, title, planned_date, planned_start_time, color, status }` formatında.
+**Ayarlar (Settings sayfasına ek):**
+- Varsayılan rapor formatı: Düz Metin / Slack Markdown / Teams HTML.
+- “Dün” kapsamına alınacak görev durumları: `done` (varsayılan), isteğe bağlı `in_progress` görevler de dahil edilebilir.
+- “Engeller” bölümünde sadece `blocks` bağlantıları mı gösterilsin, yoksa manuel girilen notlar da eklensin? (şimdilik sadece blocks).
 
-### 27.3 Görev ve Board Entegrasyonu
-
-- **Board** (Görev 12) yalnızca `tasks` tablosundaki kayıtları gösterir. `task_type` bilgisine göre görsel farklılık (bug → kırmızı ikon, tech_debt → turuncu) korunur.
-- **Yeni görev oluşturma** modalinde sadece “Görev” ve “Etkinlik” seçenekleri olur. Bug veya Teknik Borç eklemek isteyen kullanıcı, Dashboard’daki ilgili widget üzerinden veya ana menüdeki “Bug’lar” / “Teknik Borçlar” sayfasından ekler.
-- Bir Bug veya Teknik Borcu göreve dönüştürme: İlgili panelde her kaydın yanında **“Göreve Dönüştür”** butonu bulunur. Tıklandığında, oluşan görev Board’a düşer.
-
-### 27.4 Takvim Entegrasyonu
-
-- Takvim (Görev 13) `getCalendarItems` metodunu kullanır.
-- Bir Bug veya Teknik Borcu takvimde göstermek için: İlgili varlığın detayında bir **“Takvime Ekle”** butonu bulunur. Tıklandığında `planned_date` alanı seçilir (mini bir tarih/saat seçici ile). Bu alan doldurulduğu anda takvimde görünür.
-- Takvimden kaldırmak için `planned_date` null yapılır.
-
-### 27.5 Dashboard Güncellemesi
-
-Widget’lar güncellenir:
-- **“Açık Bug’lar”** widget’ı doğrudan `bugs` tablosundan okur.
-- **“Teknik Borç Özeti”** widget’ı doğrudan `tech_debts` tablosundan okur.
-- İsteğe bağlı olarak her iki widget’ta da “Yeni Ekle” butonu bulunur.
-
-### 27.6 Eski Yapıdan Geçiş (Migrasyon)
-
-- Daha önce `tasks` tablosuna `task_type` olarak `bug` veya `tech_debt` eklenmiş olabilir. Bunlar için bir kerelik migrasyon script’i çalıştırılır: `task_type = 'bug'` olanlar `bugs` tablosuna, `'tech_debt'` olanlar `tech_debts` tablosuna kopyalanır ve `task_id` ile bağlanır. Ardından `tasks` tablosundaki `task_type` değerleri `'task'` olarak güncellenir (opsiyonel). Bu sayede veri kaybı olmaz.
+### 27.3 Entegrasyon ve Otomasyon İpuçları
+- Dashboard widget’ı: “Bugünün Stand-up’ı” başlığı altında son oluşturulan raporun ilk 3 satırı ve “Düzenle” butonu.
+- Eğer kullanıcı uygulamayı her sabah açtığında otomatik olarak bu modalın açılmasını isterse, ayarlara “Uygulama açıldığında stand-up raporunu göster” seçeneği eklenebilir (opsiyonel).
 
 ---
 
-## Sonuç
+## Görev 28: Derin Öğrenme / Problem Çözme Günlüğü (Deep Work Log)
 
-Bu yapı ile:
-- **Görev Panosu** sadece gerçek görevleri gösterir.
-- **Bug ve Teknik Borç** kendi özel yönetim alanlarında takip edilir.
-- **“Göreve Dönüştür”** ile istediğin zaman board’a taşırsın.
-- **“Takvime Ekle”** ile istediğin varlığı takvimde planlarsın.
-- **Dashboard** tüm bu ayrık varlıkları tek bir görünümde toplar.
+**Amaç:** Zor bir algoritma veya mimari üzerinde çalışırken düşünce sürecini adım adım, zaman damgalarıyla kaydetmek. Her giriş, o anki odaklanma oturumuna bağlanır. Daha sonra “Bu çözüme nasıl ulaşmıştım?” sorusuna kronolojik bir cevap sunar.
 
-Bu tasarım, uygulamanın modülerliğini ve netliğini korurken sana tam kontrol sağlar. Dilersen bu mimariye uygun şekilde Görev 27’yi daha detaylı (arayüz bileşenleri, store yapısı vs.) açabilirim. Onay verirsen devam edelim! 🚀
+### 28.1 Veritabanı Güncellemesi
+
+Yeni bir tablo, `task_sessions` ve `tasks` ile ilişkili:
+
+```sql
+CREATE TABLE IF NOT EXISTS deep_work_entries (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  task_id INTEGER NOT NULL,
+  session_id INTEGER,
+  content TEXT NOT NULL,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+  FOREIGN KEY (session_id) REFERENCES task_sessions(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_deep_work_task ON deep_work_entries(task_id);
+CREATE INDEX IF NOT EXISTS idx_deep_work_session ON deep_work_entries(session_id);
+```
+
+- `task_id`: Girişin bağlı olduğu görev (zorunlu).
+- `session_id`: O anda aktif olan odaklanma oturumu. Eğer giriş, bir oturum sırasında eklenirse otomatik olarak atanır; oturum yoksa null kalır. Bu sayede “Bu düşünceyi 45 dakikalık derin çalışma sırasında kaydetmişim” bilgisi korunur.
+- `content`: Markdown destekli metin. Başlangıçta düz metin yeterlidir, sonradan Markdown render eklenebilir.
+
+### 28.2 IPC Metodları
+
+- `addDeepWorkEntry(taskId, sessionId?, content)` → Yeni giriş ekler, eklenen satırı döndürür. Eğer `sessionId` verilmezse, aktif oturumun ID’si Zustand store’dan alınarak renderer tarafından gönderilir.
+- `updateDeepWorkEntry(id, content)` → İçeriği günceller, `updated_at` yeniler.
+- `deleteDeepWorkEntry(id)` → Girişi siler.
+- `getDeepWorkEntries(taskId)` → Göreve ait tüm girişleri `created_at` sırasına göre (en yeniden en eskiye) getirir. Her girişe ek olarak, eğer `session_id` doluysa, o oturumun başlangıç saati ve süresi de join ile getirilebilir (opsiyonel; başlangıçta gerekmez, sadece girişin kendi `created_at` zamanı yeterlidir).
+
+### 28.3 Arayüz Gereksinimleri
+
+**Görev detayında yeni bir sekme: “Düşünce Akışı”.**
+
+- Sekme aktif olduğunda, `getDeepWorkEntries` ile liste yüklenir.
+- **Zaman çizelgesi görünümü:** Dikey bir çizgi üzerinde, her giriş bir zaman damgası ve içerik kartı olarak gösterilir.
+  - Sol tarafta tarih ve saat (ör. `14:32`), altında oturum bilgisi (varsa: `45 dk’lık odaklanma` veya `Oturum dışı`).
+  - Sağ tarafta içerik kartı: düz metin veya ileride Markdown render edilmiş halde. Başlangıçta basit bir `<div>` veya `<pre>` ile gösterilir.
+- En üstte **“Yeni Giriş Ekle”** butonu. Butona tıklandığında, zaman çizelgesinin en üstünde bir metin giriş alanı açılır. Placeholder: “Bu çözüme nasıl ulaştığını, denediğin yöntemleri, aklına gelenleri yaz…”
+- Kullanıcı metni yazıp Enter’a bastığında (veya butona tıklayarak) giriş kaydedilir ve liste güncellenir. Eğer o anda aktif bir odaklanma oturumu varsa `sessionId` otomatik eklenir.
+- Her mevcut girişin sağ üst köşesinde **düzenleme** (kalem) ve **silme** (çöp) simgeleri bulunur. Düzenleme modunda aynı alan inline edit olarak değiştirilebilir.
+- **Otomatik oturum bağlama:** Eğer kullanıcı bir görev üzerinde pomodoro başlatmışsa ve o sırada Düşünce Akışı sekmesine yeni bir giriş eklerse, `sessionId` store’dan alınıp IPC’ye gönderilir. Hiçbir aktif oturum yoksa null kalır.
+
+**Tasarım:**
+- Zaman çizelgesi çizgisi ince, tema rengine uygun (Soft Light'ta gri, Dark'ta soluk mor).
+- Giriş kartları hafif gölgeli, yuvarlak köşeli. Kendi temasına uyum sağlar.
+- Oturum bilgisi küçük bir rozet olarak gösterilebilir: `⏱️ 45 dk`.
+- Boş durumda: “Bu görev için henüz düşünce akışı girişi yok. Zorlandığın anları, bulduğun çözümleri buraya kaydet.” mesajı.
+
+### 28.4 Diğer Modüllerle Entegrasyon
+
+- **Arama (Görev 20):** `deep_work_entries` tablosundaki `content` alanı, FTS5 `search_index` tablosuna `source_type = 'deep_work'` olarak eklenir. Böylece “şu hatayı nasıl çözmüştüm?” diye arandığında ilgili düşünce akışı sonuçlarda çıkar.
+- **Dashboard (Görev 26):** İsteğe bağlı olarak “Son Düşünce Akışları” widget’ı eklenebilir: en son giriş yapılan 3 görevi ve kısa önizlemeleri gösterir.
+- **Oturum Notları (Görev 19) ile fark:** Oturum notları oturum sonunda alınan kısa genel nottur; Düşünce Akışı ise süreç boyunca canlı olarak eklenen, adım adım bir problem çözme günlüğüdür. İkisi tamamlayıcıdır.
+
+---
+
+Bu iki özellik, FocusFlow’u hem günlük iletişimini (stand-up) hem de derin teknik düşünme sürecini yönetebilen bir geliştirici asistanına dönüştürecek. Görev 27 her sabah 2 dakikada raporunu hazırlamanı sağlarken, Görev 28 karmaşık problemleri çözerken aklındaki adımları asla kaybetmemeni garantiler.
+
+Herhangi birini uygularken ek detay ya da yardım istersen hemen yazabilirsin. Sırada hangi özellik var? 🚀

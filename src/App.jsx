@@ -16,6 +16,7 @@ import AnalyticsView from './components/AnalyticsView';
 import SettingsView from './components/SettingsView';
 import BugsView from './components/BugsView';
 import TechDebtsView from './components/TechDebtsView';
+import StandupModal from './components/StandupModal';
 import CommandPaletteModal from './components/CommandPaletteModal';
 import SessionEndModal from './components/SessionEndModal';
 import YesterdaySummaryToast from './components/YesterdaySummaryToast';
@@ -28,6 +29,7 @@ import { useTimerStore } from './stores/useTimerStore';
 export default function App() {
   const [currentTab, setCurrentTab] = useState('tasks');
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+  const [isStandupModalOpen, setIsStandupModalOpen] = useState(false);
   const [taskToEdit, setTaskToEdit] = useState(null);
   const [shareTask, setShareTask] = useState(null);
 
@@ -56,8 +58,21 @@ export default function App() {
         toggleCommandPalette();
       }
     };
+    
+    const handleGlobalShortcuts = (e) => {
+      // Ctrl + Shift + U for Stand-up Modal
+      if (e.ctrlKey && e.shiftKey && (e.key === 'u' || e.key === 'U')) {
+        e.preventDefault();
+        setIsStandupModalOpen(prev => !prev);
+      }
+    };
+
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleGlobalShortcuts);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keydown', handleGlobalShortcuts);
+    };
   }, []);
 
   const handleOpenAddModal = () => {
@@ -99,7 +114,11 @@ export default function App() {
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-app-primary text-app-primary">
       {/* Sidebar Navigation */}
-      <Sidebar currentTab={currentTab} setCurrentTab={setCurrentTab} />
+      <Sidebar 
+        currentTab={currentTab} 
+        setCurrentTab={setCurrentTab} 
+        onOpenStandup={() => setIsStandupModalOpen(true)}
+      />
 
       {/* Main View Area */}
       <main className="flex-1 flex flex-col h-full overflow-hidden">
@@ -179,6 +198,11 @@ export default function App() {
         task={shareTask}
         isOpen={Boolean(shareTask)}
         onClose={() => setShareTask(null)}
+      />
+
+      <StandupModal
+        isOpen={isStandupModalOpen}
+        onClose={() => setIsStandupModalOpen(false)}
       />
 
       <YesterdaySummaryToast />

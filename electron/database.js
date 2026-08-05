@@ -214,6 +214,19 @@ export async function initDatabase() {
       updated_at TEXT NOT NULL,
       FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL
     );
+
+    CREATE TABLE IF NOT EXISTS deep_work_entries (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      task_id INTEGER NOT NULL,
+      session_id INTEGER,
+      content TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+      FOREIGN KEY (session_id) REFERENCES task_sessions(id) ON DELETE SET NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_deep_work_task ON deep_work_entries(task_id);
+    CREATE INDEX IF NOT EXISTS idx_deep_work_session ON deep_work_entries(session_id);
   `);
 
   // Güvenli Migrasyonlar
@@ -232,6 +245,12 @@ export async function initDatabase() {
       }
       if (!columns.includes('auto_complete_subtasks')) {
         db.run("ALTER TABLE tasks ADD COLUMN auto_complete_subtasks INTEGER DEFAULT 0");
+      }
+      if (!columns.includes('recurrence_group_id')) {
+        db.run("ALTER TABLE tasks ADD COLUMN recurrence_group_id TEXT");
+      }
+      if (!columns.includes('recurrence_rule')) {
+        db.run("ALTER TABLE tasks ADD COLUMN recurrence_rule TEXT");
       }
     }
 
@@ -576,8 +595,8 @@ export function getTasks(filterStatus = 'all') {
 export function addTask(taskData) {
   const now = new Date().toISOString();
   db.run(
-    `INSERT INTO tasks (title, description, estimated_minutes, priority, category, color, created_at, updated_at, status, planned_date, planned_start_time, task_type, auto_complete_subtasks)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO tasks (title, description, estimated_minutes, priority, category, color, created_at, updated_at, status, planned_date, planned_start_time, task_type, auto_complete_subtasks, recurrence_group_id, recurrence_rule)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       taskData.title,
       taskData.description || '',
@@ -592,6 +611,8 @@ export function addTask(taskData) {
       taskData.planned_start_time || null,
       taskData.task_type || 'task',
       taskData.auto_complete_subtasks || 0,
+      taskData.recurrence_group_id || null,
+      taskData.recurrence_rule || null,
     ]
   );
   saveDb();
@@ -600,6 +621,15 @@ export function addTask(taskData) {
     indexRecord('task', newTask.id, newTask.title, newTask.description || '', newTask.id, newTask.planned_date || now.slice(0, 10), newTask.status);
   }
   return newTask;
+}
+
+export function deleteRecurringGroup(groupId) {
+  if (!groupId) return false;
+  const tasksToDelete = resultToObjects(db.exec(`SELECT id FROM tasks WHERE recurrence_group_id = '${groupId}'`));
+  tasksToDelete.forEach((t) => {
+    deleteTask(t.id);
+  });
+  return true;
 }
 
 export function updateTask(id, taskData) {
@@ -973,6 +1003,55 @@ export function endCourseSession(sessionId) {
   return resultToObjects(updatedRes)[0];
 }
 
+// LINK İŞLEMLERİ
+export function getLinks() {
+  const res = db.exec('SELECT * FROM links ORDER BY created_at DESC');
+  return resultToObjects(res);
+}
+
+export function addLink(linkData) {
+  const now = new Date().toISOString();
+  db.run(
+    `INSERT INTO links (title, url, category, created_at) VALUES (?, ?, ?, ?)`,
+    [linkData.title, linkData.url || '', linkData.category || 'Genel', now]
+  );
+  saveDb();
+  return getLastInserted('links');
+}
+
+export function addBatchLinks(linksArray) {
+  if (!Array.isArray(linksArray) || linksArray.length === 0) return [];
+  const now = new Date().toISOString();
+  const addedLinks = [];
+
+  for (const item of linksArray) {
+    if (item && item.title && item.url) {
+      db.run(
+        `INSERT INTO links (title, url, category, created_at) VALUES (?, ?, ?, ?)`,
+        [item.title.trim(), item.url.trim(), item.category ? item.category.trim() : 'Genel', now]
+      );
+      addedLinks.push(getLastInserted('links'));
+    }
+  }
+  saveDb();
+  return addedLinks;
+}
+
+export function updateLink(id, linkData) {
+  db.run(
+    `UPDATE links SET title = ?, url = ?, category = ? WHERE id = ?`,
+    [linkData.title, linkData.url, linkData.category || 'Genel', id]
+  );
+  saveDb();
+  return true;
+}
+
+export function deleteLink(id) {
+  db.run(`DELETE FROM links WHERE id = ${id}`);
+  saveDb();
+  return true;
+}
+
 // DOSYA EKLERİ (ATTACHMENTS - Görev 15)
 export function getTaskAttachments(taskId) {
   const res = db.exec(`SELECT * FROM task_attachments WHERE task_id = ${taskId} ORDER BY added_at DESC`);
@@ -1236,36 +1315,7 @@ export function getTodayPlannedEvents() {
   });
 }
 
-// LINKLER İŞLEMLERİ
-export function getLinks() {
-  const res = db.exec('SELECT * FROM links ORDER BY created_at DESC');
-  return resultToObjects(res);
-}
 
-export function addLink(linkData) {
-  const now = new Date().toISOString();
-  db.run(
-    `INSERT INTO links (title, url, category, created_at) VALUES (?, ?, ?, ?)`,
-    [linkData.title, linkData.url || '', linkData.category || 'Genel', now]
-  );
-  saveDb();
-  return getLastInserted('links');
-}
-
-export function updateLink(id, linkData) {
-  db.run(
-    `UPDATE links SET title = ?, url = ?, category = ? WHERE id = ?`,
-    [linkData.title, linkData.url || '', linkData.category || 'Genel', id]
-  );
-  saveDb();
-  return true;
-}
-
-export function deleteLink(id) {
-  db.run(`DELETE FROM links WHERE id = ${id}`);
-  saveDb();
-  return true;
-}
 
 // ==========================
 // TECH DEBTS CRUD
@@ -1382,4 +1432,102 @@ export function deleteBug(id) {
   db.run(`DELETE FROM bugs WHERE id = ${id}`);
   saveDb();
   return true;
+}
+
+// ==========================
+// DEEP WORK ENTRIES CRUD
+// ==========================
+export function getDeepWorkEntries(taskId) {
+  const res = db.exec(`SELECT * FROM deep_work_entries WHERE task_id = ${taskId} ORDER BY created_at DESC`);
+  return resultToObjects(res);
+}
+
+export function addDeepWorkEntry(taskId, sessionId, content) {
+  const now = new Date().toISOString();
+  db.run(
+    `INSERT INTO deep_work_entries (task_id, session_id, content, created_at, updated_at) 
+     VALUES (?, ?, ?, ?, ?)`,
+    [taskId, sessionId || null, content, now, now]
+  );
+  saveDb();
+  return getLastInserted('deep_work_entries');
+}
+
+export function updateDeepWorkEntry(id, content) {
+  const now = new Date().toISOString();
+  db.run(`UPDATE deep_work_entries SET content = ?, updated_at = ? WHERE id = ?`, [content, now, id]);
+  saveDb();
+  return true;
+}
+
+export function deleteDeepWorkEntry(id) {
+  db.run(`DELETE FROM deep_work_entries WHERE id = ${id}`);
+  saveDb();
+  return true;
+}
+
+// ==========================
+// STANDUP REPORT
+// ==========================
+export function generateStandupReport(dateStr) {
+  const targetDate = dateStr || new Date().toISOString().split('T')[0];
+  const targetDateObj = new Date(targetDate);
+  const yesterdayObj = new Date(targetDateObj);
+  yesterdayObj.setDate(targetDateObj.getDate() - 1);
+  const yesterdayStr = yesterdayObj.toISOString().split('T')[0];
+
+  const yesterdayRes = db.exec(`
+    SELECT t.id, t.title, 
+           (SELECT SUM(duration_seconds) FROM task_sessions ts WHERE ts.task_id = t.id) as duration_seconds
+    FROM tasks t
+    WHERE t.status = 'done' AND date(t.updated_at) = '${yesterdayStr}'
+  `);
+  const yesterday = resultToObjects(yesterdayRes);
+
+  const todayRes = db.exec(`
+    SELECT id, title, planned_start_time as planned_start
+    FROM tasks
+    WHERE status = 'in_progress' OR planned_date = '${targetDate}'
+  `);
+  const today = resultToObjects(todayRes);
+
+  const blockersRes = db.exec(`
+    SELECT tl.source_task_id as task_id, t1.title as task_title, 
+           tl.target_task_id as blocker_task_id, t2.title as blocker_title
+    FROM task_links tl
+    JOIN tasks t1 ON tl.source_task_id = t1.id
+    JOIN tasks t2 ON tl.target_task_id = t2.id
+    WHERE tl.link_type = 'blocks' AND t2.status != 'done'
+  `);
+  const blockers = resultToObjects(blockersRes);
+
+  let suggestedText = "**Dün:**\n";
+  if (yesterday.length) {
+    yesterday.forEach(y => {
+      const durationMins = Math.floor((y.duration_seconds || 0) / 60);
+      suggestedText += `- ${y.title} (${durationMins} dk)\n`;
+    });
+  } else {
+    suggestedText += "- Dün tamamlanan görev yok.\n";
+  }
+
+  suggestedText += "\n**Bugün:**\n";
+  if (today.length) {
+    today.forEach(t => {
+      suggestedText += `- ${t.title}${t.planned_start ? ' (' + t.planned_start + ')' : ''}\n`;
+    });
+  } else {
+    suggestedText += "- Bugün için planlanan görev yok.\n";
+  }
+
+  suggestedText += "\n**Engeller:**\n";
+  if (blockers.length) {
+    blockers.forEach(b => {
+      suggestedText += `- "${b.task_title}" şu görev tarafından engelleniyor: "${b.blocker_title}"\n`;
+    });
+  } else {
+    suggestedText += "- Bilinen bir engel yok.\n";
+  }
+
+  return { yesterday, today, blockers, suggested_text: suggestedText };
 }

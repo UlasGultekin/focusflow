@@ -68,6 +68,8 @@ function ImageStrip({ images, onRemove, onOpen }) {
 export default function TechDebtsView() {
   const { techDebts, fetchTechDebts, addTechDebt, deleteTechDebt, updateTechDebt, convertToTask } = useTechDebtStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingTechDebt, setEditingTechDebt] = useState(null);
+  
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('refactor');
@@ -143,11 +145,11 @@ export default function TechDebtsView() {
     }
   };
 
-  const handleAddTechDebt = async (e) => {
+  const handleSaveTechDebt = async (e) => {
     e.preventDefault();
     if (!title.trim()) return;
 
-    await addTechDebt({
+    const data = {
       title,
       description,
       category,
@@ -156,9 +158,16 @@ export default function TechDebtsView() {
       images_json: JSON.stringify(images),
       attachments_json: JSON.stringify(attachments),
       project
-    });
+    };
+
+    if (editingTechDebt) {
+      await updateTechDebt(editingTechDebt.id, data);
+    } else {
+      await addTechDebt(data);
+    }
 
     setIsModalOpen(false);
+    setEditingTechDebt(null);
     setTitle('');
     setDescription('');
     setCategory('refactor');
@@ -167,6 +176,32 @@ export default function TechDebtsView() {
     setImages([]);
     setAttachments([]);
     setProject('Genel');
+  };
+
+  const openEditModal = (td) => {
+    setEditingTechDebt(td);
+    setTitle(td.title || '');
+    setDescription(td.description || '');
+    setCategory(td.category || 'refactor');
+    setEstimatedMinutes(td.estimated_minutes || 60);
+    setPlannedDate(td.planned_date || '');
+    setImages(parseJsonField(td.images_json));
+    setAttachments(parseJsonField(td.attachments_json));
+    setProject(td.project || 'Genel');
+    setIsModalOpen(true);
+  };
+
+  const openAddModal = () => {
+    setEditingTechDebt(null);
+    setTitle('');
+    setDescription('');
+    setCategory('refactor');
+    setEstimatedMinutes(60);
+    setPlannedDate('');
+    setImages([]);
+    setAttachments([]);
+    setProject('Genel');
+    setIsModalOpen(true);
   };
 
   const filteredTechDebts = projectFilter === 'all' 
@@ -199,7 +234,7 @@ export default function TechDebtsView() {
           </select>
 
           <button
-            onClick={() => setIsModalOpen(true)}
+            onClick={openAddModal}
             className="bg-app-primary text-app-primary border border-app hover:border-app-accent px-4 py-2 rounded-xl text-sm font-semibold transition-all flex items-center gap-2"
           >
             <Plus className="w-4 h-4" /> Teknik Borç Ekle
@@ -272,6 +307,9 @@ export default function TechDebtsView() {
                         <ArrowRight className="w-3 h-3" /> Göreve Dönüştür
                       </button>
                     )}
+                    <button onClick={() => openEditModal(td)} className="p-1.5 text-app-muted hover:text-indigo-500 transition-colors">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-edit-3"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                    </button>
                     <button onClick={() => deleteTechDebt(td.id)} className="p-1.5 text-app-muted hover:text-amber-500 transition-colors">
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -286,8 +324,8 @@ export default function TechDebtsView() {
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-app-surface w-full max-w-lg rounded-2xl border border-app shadow-2xl p-6" onDrop={handleDrop} onDragOver={e => e.preventDefault()}>
-            <h2 className="text-lg font-bold mb-4">Yeni Teknik Borç Ekle</h2>
-            <form onSubmit={handleAddTechDebt} className="space-y-4">
+            <h2 className="text-lg font-bold mb-4">{editingTechDebt ? 'Teknik Borç Düzenle' : 'Yeni Teknik Borç Ekle'}</h2>
+            <form onSubmit={handleSaveTechDebt} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-app-secondary mb-1">Başlık</label>
                 <input required value={title} onChange={(e) => setTitle(e.target.value)} className="w-full bg-app-bg border border-app rounded-xl px-3 py-2 text-sm outline-hidden focus:border-amber-500" />
