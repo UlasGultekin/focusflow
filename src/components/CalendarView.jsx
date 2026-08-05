@@ -16,6 +16,7 @@ import {
   Repeat,
   Grid,
   List,
+  Sparkles,
 } from 'lucide-react';
 import { useTaskStore } from '../stores/useTaskStore';
 import { useBugStore } from '../stores/useBugStore';
@@ -242,24 +243,27 @@ export default function CalendarView() {
 
   return (
     <div className="flex-1 flex flex-col h-screen bg-app-primary overflow-y-auto select-none">
-      {/* Header Bar */}
-      <div className="p-6 border-b border-app bg-app-surface flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-app-accent-light text-app-accent flex items-center justify-center font-bold">
+      {/* Premium Glassmorphic Header Bar */}
+      <div className="p-6 border-b border-app bg-app-surface/80 backdrop-blur-md sticky top-0 z-20 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xs">
+        <div className="flex items-center gap-3.5">
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-app-accent to-indigo-500 text-white flex items-center justify-center font-bold shadow-md shadow-app-accent/20">
             <CalendarIcon className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-app-primary">Takvim & Planlayıcı</h2>
-            <p className="text-xs text-app-secondary">
-              Günlük, haftalık ve aylık görünümlerde planlarınızı yönetin
+            <h2 className="text-xl font-extrabold text-app-primary tracking-tight flex items-center gap-2">
+              Takvim & Zaman Çizelgesi
+              <Sparkles className="w-4 h-4 text-amber-500 animate-pulse" />
+            </h2>
+            <p className="text-xs text-app-secondary font-medium">
+              Gününüzü ve haftanızı üst düzey akıcı arayüz ile planlayın
             </p>
           </div>
         </div>
 
         {/* View Switcher & Date Controls */}
         <div className="flex items-center gap-3 flex-wrap">
-          {/* Day / Week / Month Mode Tabs */}
-          <div className="flex items-center gap-1 bg-app-secondary p-1 rounded-xl">
+          {/* Glass View Mode Switcher */}
+          <div className="flex items-center gap-1 bg-app-secondary/80 p-1 rounded-2xl border border-app shadow-inner">
             {[
               { id: 'day', label: 'Günlük' },
               { id: 'week', label: 'Haftalık' },
@@ -268,9 +272,9 @@ export default function CalendarView() {
               <button
                 key={mode.id}
                 onClick={() => setViewMode(mode.id)}
-                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                className={`px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all duration-200 ${
                   viewMode === mode.id
-                    ? 'bg-app-surface text-app-primary shadow-xs'
+                    ? 'bg-app-surface text-app-accent shadow-sm border border-app'
                     : 'text-app-muted hover:text-app-primary'
                 }`}
               >
@@ -281,24 +285,24 @@ export default function CalendarView() {
 
           <button
             onClick={() => setSelectedDate(new Date())}
-            className="px-3 py-1.5 rounded-xl border border-app text-app-primary font-semibold text-xs hover:bg-app-surface-hover transition-all"
+            className="px-3.5 py-1.5 rounded-2xl border border-app bg-app-surface text-app-primary font-bold text-xs hover:border-app-accent/50 hover:bg-app-surface-hover transition-all shadow-xs"
           >
             Bugün
           </button>
 
-          <div className="flex items-center gap-1 bg-app-secondary p-1 rounded-xl">
+          <div className="flex items-center gap-1 bg-app-surface border border-app p-1 rounded-2xl shadow-xs">
             <button
               onClick={handlePrev}
-              className="p-1 rounded-lg text-app-secondary hover:text-app-primary hover:bg-app-surface"
+              className="p-1.5 rounded-xl text-app-secondary hover:text-app-primary hover:bg-app-secondary transition-colors"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <span className="text-xs font-bold text-app-primary px-3 capitalize">
+            <span className="text-xs font-extrabold text-app-primary px-3 capitalize">
               {getHeaderTitleText()}
             </span>
             <button
               onClick={handleNext}
-              className="p-1 rounded-lg text-app-secondary hover:text-app-primary hover:bg-app-surface"
+              className="p-1.5 rounded-xl text-app-secondary hover:text-app-primary hover:bg-app-secondary transition-colors"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
@@ -306,9 +310,9 @@ export default function CalendarView() {
 
           <button
             onClick={() => setIsPlanModalOpen(true)}
-            className="px-4 py-2 rounded-xl bg-app-accent text-white font-semibold text-xs hover:opacity-90 transition-all flex items-center gap-1.5 shadow-xs"
+            className="px-4 py-2 rounded-2xl bg-gradient-to-r from-app-accent to-indigo-600 text-white font-bold text-xs hover:opacity-95 transition-all flex items-center gap-2 shadow-md shadow-app-accent/25 hover:scale-[1.02] active:scale-95"
           >
-            <Plus className="w-4 h-4" /> Plan Ekle
+            <Plus className="w-4 h-4" /> Yeni Plan Ekle
           </button>
         </div>
       </div>
@@ -321,29 +325,40 @@ export default function CalendarView() {
         {viewMode === 'day' && (
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
             {/* Left: Unplanned Tasks Sidebar */}
-            <div className="bg-app-surface border border-app rounded-2xl p-4 shadow-xs space-y-3">
-              <h3 className="font-bold text-sm text-app-primary flex items-center gap-2">
-                <CalendarDays className="w-4 h-4 text-app-accent" /> Planlanmamış Görevler
-              </h3>
-              <p className="text-[11px] text-app-muted">Tıklayarak bu güne atayabilirsiniz:</p>
+            <div className="bg-app-surface border border-app rounded-3xl p-5 shadow-sm space-y-4">
+              <div className="flex items-center justify-between border-b border-app pb-3">
+                <h3 className="font-extrabold text-sm text-app-primary flex items-center gap-2">
+                  <CalendarDays className="w-4.5 h-4.5 text-app-accent" /> Planlanmamış
+                </h3>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-app-accent-light text-app-accent">
+                  {unplannedTasks.length}
+                </span>
+              </div>
+              <p className="text-[11px] text-app-muted font-medium leading-relaxed">
+                Aşağıdaki sürükleyebilir veya tıklayarak bu güne saat 10:00 olarak atayabilirsiniz:
+              </p>
 
-              <div className="space-y-2 max-h-[500px] overflow-y-auto">
+              <div className="space-y-2.5 max-h-[520px] overflow-y-auto pr-1">
                 {unplannedTasks.length === 0 ? (
-                  <p className="text-xs text-app-muted text-center py-6">
-                    Tüm görevler planlanmış!
-                  </p>
+                  <div className="text-center py-10 text-app-muted space-y-2">
+                    <CheckCircle2 className="w-8 h-8 text-emerald-500/60 mx-auto" />
+                    <p className="text-xs font-semibold">Tüm görevler planlanmış!</p>
+                  </div>
                 ) : (
                   unplannedTasks.map((t) => (
                     <div
                       key={t.id}
                       onClick={() => handleAssignToDate(t, '10:00')}
-                      className="p-3 rounded-xl border border-app bg-app-primary hover:border-app-accent cursor-pointer transition-all text-xs group"
+                      className="p-3.5 rounded-2xl border border-app bg-app-primary hover:border-app-accent/60 hover:shadow-md transition-all cursor-pointer text-xs group relative overflow-hidden"
                     >
-                      <div className="font-semibold text-app-primary truncate">{t.title}</div>
-                      <div className="flex items-center justify-between mt-2 text-[10px] text-app-muted">
-                        <span>{t.estimated_minutes}dk</span>
-                        <span className="text-app-accent font-semibold group-hover:underline">
-                          Bu güne ata →
+                      <div className="w-1 h-full bg-app-accent absolute left-0 top-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <div className="font-bold text-app-primary truncate pl-1">{t.title}</div>
+                      <div className="flex items-center justify-between mt-2.5 text-[10px] text-app-muted font-semibold pl-1">
+                        <span className="flex items-center gap-1 bg-app-secondary px-2 py-0.5 rounded-md">
+                          <Clock className="w-3 h-3 text-app-accent" /> {t.estimated_minutes}dk
+                        </span>
+                        <span className="text-app-accent font-bold group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
+                          Ata →
                         </span>
                       </div>
                     </div>
@@ -353,13 +368,17 @@ export default function CalendarView() {
             </div>
 
             {/* Right: Daily Timeline (07:00 - 23:00) */}
-            <div className="lg:col-span-3 bg-app-surface border border-app rounded-2xl p-5 shadow-xs space-y-1">
-              <div className="text-xs font-bold text-app-secondary border-b border-app pb-3 mb-2 flex items-center justify-between">
-                <span>Saatlik Günlük Çizelge</span>
-                <span>{dayTasks.length + dayNotes.length + dayBugs.length + dayTechDebts.length} Planlı Etkinlik</span>
+            <div className="lg:col-span-3 bg-app-surface border border-app rounded-3xl p-6 shadow-sm space-y-2">
+              <div className="text-xs font-extrabold text-app-secondary border-b border-app pb-4 mb-3 flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-app-accent" /> Saatlik Zaman Çizelgesi
+                </span>
+                <span className="bg-app-secondary px-3 py-1 rounded-full text-app-primary font-bold">
+                  {dayTasks.length + dayNotes.length + dayBugs.length + dayTechDebts.length} Etkinlik
+                </span>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {HOURS.map((hour) => {
                   const hourStr = `${hour.toString().padStart(2, '0')}:00`;
 
@@ -386,16 +405,16 @@ export default function CalendarView() {
                   return (
                     <div
                       key={hour}
-                      className="flex items-start gap-4 p-2 rounded-xl hover:bg-app-surface-hover border border-transparent hover:border-app transition-all group"
+                      className="flex items-start gap-4 p-2.5 rounded-2xl hover:bg-app-surface-hover/80 border border-transparent hover:border-app/60 transition-all duration-200 group"
                     >
-                      <span className="w-14 text-xs font-mono font-bold text-app-muted pt-1">
+                      <span className="w-14 text-xs font-mono font-extrabold text-app-muted pt-1 shrink-0">
                         {hourStr}
                       </span>
 
-                      <div className="flex-1 min-h-[44px] flex flex-wrap items-center gap-2 border-l-2 border-app pl-4">
+                      <div className="flex-1 min-h-[48px] flex flex-wrap items-center gap-2.5 border-l-2 border-app/60 pl-4 transition-colors group-hover:border-app-accent/40">
                         {isOverlap && (
-                          <span className="text-[10px] font-bold text-rose-500 bg-rose-500/10 px-2 py-0.5 rounded-md flex items-center gap-1">
-                            <AlertTriangle className="w-3 h-3" /> Zaman Çakışması!
+                          <span className="text-[10px] font-extrabold text-rose-500 bg-rose-500/10 border border-rose-500/20 px-2.5 py-1 rounded-xl flex items-center gap-1.5 animate-pulse">
+                            <AlertTriangle className="w-3.5 h-3.5" /> Zaman Çakışması!
                           </span>
                         )}
 
@@ -405,9 +424,9 @@ export default function CalendarView() {
                               setPlanTime(hourStr);
                               setIsPlanModalOpen(true);
                             }}
-                            className="text-[11px] text-app-muted opacity-0 group-hover:opacity-100 transition-opacity hover:text-app-primary cursor-pointer w-full text-left"
+                            className="text-[11px] font-semibold text-app-muted/60 opacity-0 group-hover:opacity-100 transition-opacity hover:text-app-accent cursor-pointer w-full text-left py-1"
                           >
-                            + Etkinlik Ekle
+                            + Yeni Plan / Etkinlik Ekle
                           </button>
                         ) : (
                           <>
@@ -415,15 +434,15 @@ export default function CalendarView() {
                               <div
                                 key={'t-' + task.id}
                                 onClick={() => setSelectedTaskDetail(task)}
-                                className="px-3 py-2 rounded-xl text-xs font-semibold text-white shadow-xs flex items-center gap-2 cursor-pointer hover:opacity-90 transition-opacity"
+                                className="px-3.5 py-2.5 rounded-2xl text-xs font-bold text-white shadow-sm flex items-center gap-2 cursor-pointer hover:scale-[1.01] hover:shadow-md transition-all border border-white/10"
                                 style={{ backgroundColor: task.color || '#5B8DEF' }}
                               >
-                                <Clock className="w-3.5 h-3.5" />
+                                <Clock className="w-3.5 h-3.5 opacity-80" />
                                 <span>{task.title}</span>
                                 {task.recurrence_group_id && (
-                                  <Repeat className="w-3 h-3 text-white/80" title="Tekrarlayan Etkinlik" />
+                                  <Repeat className="w-3.5 h-3.5 text-white/80" title="Tekrarlayan Periyot" />
                                 )}
-                                <span className="text-[10px] opacity-80">({task.estimated_minutes}dk)</span>
+                                <span className="text-[10px] opacity-75 font-mono">({task.estimated_minutes}dk)</span>
                               </div>
                             ))}
                             {notesForHour.map((note) => {
@@ -431,29 +450,29 @@ export default function CalendarView() {
                               return (
                                 <div
                                   key={'n-' + note.id}
-                                  className="px-3 py-2 rounded-xl text-xs font-semibold text-amber-800 bg-amber-100 shadow-xs flex items-center gap-2"
+                                  className="px-3.5 py-2.5 rounded-2xl text-xs font-bold text-amber-900 bg-amber-100/90 border border-amber-300 shadow-xs flex items-center gap-2"
                                 >
-                                  <StickyNote className="w-3.5 h-3.5" />
-                                  <span className="truncate max-w-[150px]">{noteTitle}</span>
+                                  <StickyNote className="w-3.5 h-3.5 text-amber-700" />
+                                  <span className="truncate max-w-[160px]">{noteTitle}</span>
                                 </div>
                               );
                             })}
                             {finalBugsForHour.map((bug) => (
                               <div
                                 key={'b-' + bug.id}
-                                className="px-3 py-2 rounded-xl text-xs font-semibold text-rose-800 bg-rose-100 shadow-xs flex items-center gap-2"
+                                className="px-3.5 py-2.5 rounded-2xl text-xs font-bold text-rose-900 bg-rose-100/90 border border-rose-300 shadow-xs flex items-center gap-2"
                               >
-                                <Bug className="w-3.5 h-3.5" />
-                                <span className="truncate max-w-[150px]">{bug.title}</span>
+                                <Bug className="w-3.5 h-3.5 text-rose-700" />
+                                <span className="truncate max-w-[160px]">{bug.title}</span>
                               </div>
                             ))}
                             {finalTechDebtsForHour.map((td) => (
                               <div
                                 key={'td-' + td.id}
-                                className="px-3 py-2 rounded-xl text-xs font-semibold text-indigo-800 bg-indigo-100 shadow-xs flex items-center gap-2"
+                                className="px-3.5 py-2.5 rounded-2xl text-xs font-bold text-indigo-900 bg-indigo-100/90 border border-indigo-300 shadow-xs flex items-center gap-2"
                               >
-                                <Wrench className="w-3.5 h-3.5" />
-                                <span className="truncate max-w-[150px]">{td.title}</span>
+                                <Wrench className="w-3.5 h-3.5 text-indigo-700" />
+                                <span className="truncate max-w-[160px]">{td.title}</span>
                               </div>
                             ))}
                           </>
@@ -471,8 +490,8 @@ export default function CalendarView() {
         {/* 2. WEEK VIEW MODE */}
         {/* ========================================================================= */}
         {viewMode === 'week' && (
-          <div className="flex-1 bg-app-surface border border-app rounded-2xl p-5 shadow-xs flex flex-col space-y-4 overflow-x-auto">
-            <div className="grid grid-cols-7 gap-3 min-w-[800px]">
+          <div className="flex-1 bg-app-surface border border-app rounded-3xl p-6 shadow-sm flex flex-col space-y-4 overflow-x-auto">
+            <div className="grid grid-cols-7 gap-3.5 min-w-[850px]">
               {eachDayOfInterval({
                 start: startOfWeek(selectedDate, { weekStartsOn: 1 }),
                 end: endOfWeek(selectedDate, { weekStartsOn: 1 }),
@@ -487,28 +506,28 @@ export default function CalendarView() {
                   <div
                     key={dStr}
                     onClick={() => setSelectedDate(day)}
-                    className={`border rounded-xl p-3 flex flex-col min-h-[450px] transition-all cursor-pointer ${
+                    className={`border rounded-2xl p-3.5 flex flex-col min-h-[480px] transition-all duration-200 cursor-pointer ${
                       isSelected
-                        ? 'border-app-accent bg-app-accent-light/30'
-                        : 'border-app bg-app-primary hover:border-app-accent/40'
+                        ? 'border-app-accent bg-app-accent-light/40 shadow-sm ring-1 ring-app-accent/30'
+                        : 'border-app bg-app-primary hover:border-app-accent/40 hover:shadow-xs'
                     }`}
                   >
                     {/* Day Column Header */}
-                    <div className="text-center pb-2 border-b border-app mb-2">
-                      <div className="text-[10px] font-bold text-app-muted uppercase">
+                    <div className="text-center pb-3 border-b border-app mb-3">
+                      <div className="text-[10px] font-extrabold text-app-muted uppercase tracking-wider">
                         {format(day, 'EEEE', { locale: tr })}
                       </div>
-                      <div className={`text-sm font-bold mt-0.5 inline-block px-2 py-0.5 rounded-full ${
-                        isToday ? 'bg-app-accent text-white' : 'text-app-primary'
+                      <div className={`text-sm font-extrabold mt-1 inline-block px-3 py-1 rounded-full ${
+                        isToday ? 'bg-gradient-to-r from-app-accent to-indigo-600 text-white shadow-xs' : 'text-app-primary'
                       }`}>
                         {format(day, 'd MMM', { locale: tr })}
                       </div>
                     </div>
 
                     {/* Day Column Items List */}
-                    <div className="flex-1 space-y-1.5 overflow-y-auto">
+                    <div className="flex-1 space-y-2 overflow-y-auto pr-0.5">
                       {totalCount === 0 ? (
-                        <div className="text-[10px] text-app-muted text-center py-8">Plan yok</div>
+                        <div className="text-[11px] font-medium text-app-muted/50 text-center py-12">Plan yok</div>
                       ) : (
                         <>
                           {dTasks.map((task) => (
@@ -518,11 +537,11 @@ export default function CalendarView() {
                                 e.stopPropagation();
                                 setSelectedTaskDetail(task);
                               }}
-                              className="p-2 rounded-lg text-xs font-semibold text-white shadow-xs space-y-1 cursor-pointer hover:opacity-90"
+                              className="p-2.5 rounded-xl text-xs font-bold text-white shadow-xs space-y-1 cursor-pointer hover:scale-[1.02] transition-transform border border-white/10"
                               style={{ backgroundColor: task.color || '#5B8DEF' }}
                             >
-                              <div className="truncate font-bold text-[11px]">{task.title}</div>
-                              <div className="text-[9px] opacity-80 flex items-center justify-between">
+                              <div className="truncate font-extrabold text-[11px] leading-tight">{task.title}</div>
+                              <div className="text-[9px] opacity-80 flex items-center justify-between font-mono pt-0.5">
                                 <span>{task.planned_start_time || '10:00'}</span>
                                 <span>{task.estimated_minutes}dk</span>
                               </div>
@@ -534,9 +553,9 @@ export default function CalendarView() {
                             return (
                               <div
                                 key={'w-n-' + note.id}
-                                className="p-1.5 rounded-lg text-[10px] font-medium text-amber-800 bg-amber-100 truncate flex items-center gap-1"
+                                className="p-2 rounded-xl text-[10px] font-bold text-amber-900 bg-amber-100/90 border border-amber-200 truncate flex items-center gap-1.5"
                               >
-                                <StickyNote className="w-3 h-3 shrink-0" />
+                                <StickyNote className="w-3.5 h-3.5 text-amber-700 shrink-0" />
                                 <span className="truncate">{noteTitle}</span>
                               </div>
                             );
@@ -545,9 +564,9 @@ export default function CalendarView() {
                           {dBugs.map((bug) => (
                             <div
                               key={'w-b-' + bug.id}
-                              className="p-1.5 rounded-lg text-[10px] font-medium text-rose-800 bg-rose-100 truncate flex items-center gap-1"
+                              className="p-2 rounded-xl text-[10px] font-bold text-rose-900 bg-rose-100/90 border border-rose-200 truncate flex items-center gap-1.5"
                             >
-                              <Bug className="w-3 h-3 shrink-0" />
+                              <Bug className="w-3.5 h-3.5 text-rose-700 shrink-0" />
                               <span className="truncate">{bug.title}</span>
                             </div>
                           ))}
@@ -555,9 +574,9 @@ export default function CalendarView() {
                           {dTechDebts.map((td) => (
                             <div
                               key={'w-td-' + td.id}
-                              className="p-1.5 rounded-lg text-[10px] font-medium text-indigo-800 bg-indigo-100 truncate flex items-center gap-1"
+                              className="p-2 rounded-xl text-[10px] font-bold text-indigo-900 bg-indigo-100/90 border border-indigo-200 truncate flex items-center gap-1.5"
                             >
-                              <Wrench className="w-3 h-3 shrink-0" />
+                              <Wrench className="w-3.5 h-3.5 text-indigo-700 shrink-0" />
                               <span className="truncate">{td.title}</span>
                             </div>
                           ))}
@@ -575,16 +594,16 @@ export default function CalendarView() {
         {/* 3. MONTH VIEW MODE */}
         {/* ========================================================================= */}
         {viewMode === 'month' && (
-          <div className="flex-1 bg-app-surface border border-app rounded-2xl p-5 shadow-xs flex flex-col space-y-3">
+          <div className="flex-1 bg-app-surface border border-app rounded-3xl p-6 shadow-sm flex flex-col space-y-3">
             {/* Days of Week Header */}
-            <div className="grid grid-cols-7 gap-2 text-center text-xs font-bold text-app-muted border-b border-app pb-2">
+            <div className="grid grid-cols-7 gap-3 text-center text-xs font-extrabold text-app-muted border-b border-app pb-3">
               {['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'].map((dayName) => (
-                <div key={dayName}>{dayName}</div>
+                <div key={dayName} className="tracking-wide uppercase text-[10px]">{dayName}</div>
               ))}
             </div>
 
             {/* Month Days Matrix */}
-            <div className="grid grid-cols-7 gap-2 flex-1">
+            <div className="grid grid-cols-7 gap-3 flex-1">
               {eachDayOfInterval({
                 start: startOfWeek(startOfMonth(selectedDate), { weekStartsOn: 1 }),
                 end: endOfWeek(endOfMonth(selectedDate), { weekStartsOn: 1 }),
@@ -601,43 +620,43 @@ export default function CalendarView() {
                     key={dStr}
                     onClick={() => {
                       setSelectedDate(day);
-                      setViewMode('day'); // Switch to day view on click
+                      setViewMode('day');
                     }}
-                    className={`border rounded-xl p-2 min-h-[95px] flex flex-col justify-between transition-all cursor-pointer ${
-                      !isCurrentMonth ? 'opacity-30 bg-app-primary/50' : 'bg-app-primary'
+                    className={`border rounded-2xl p-2.5 min-h-[105px] flex flex-col justify-between transition-all duration-200 cursor-pointer ${
+                      !isCurrentMonth ? 'opacity-35 bg-app-primary/40' : 'bg-app-primary hover:border-app-accent/60 hover:shadow-xs'
                     } ${
                       isSelected
-                        ? 'border-app-accent ring-1 ring-app-accent'
-                        : 'border-app hover:border-app-accent/50'
+                        ? 'border-app-accent ring-2 ring-app-accent/30 shadow-sm'
+                        : 'border-app'
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className={`text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center ${
-                        isToday ? 'bg-app-accent text-white' : 'text-app-primary'
+                      <span className={`text-xs font-extrabold w-6 h-6 rounded-full flex items-center justify-center ${
+                        isToday ? 'bg-gradient-to-r from-app-accent to-indigo-600 text-white shadow-xs' : 'text-app-primary'
                       }`}>
                         {format(day, 'd')}
                       </span>
                       {totalCount > 0 && (
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-app-accent-light text-app-accent">
+                        <span className="text-[9px] font-extrabold px-2 py-0.5 rounded-full bg-app-accent-light text-app-accent border border-app-accent/20">
                           {totalCount} Plan
                         </span>
                       )}
                     </div>
 
                     {/* Preview Event Badges */}
-                    <div className="space-y-1 mt-1 overflow-hidden max-h-[50px]">
+                    <div className="space-y-1 mt-1 overflow-hidden max-h-[55px]">
                       {dTasks.slice(0, 2).map((t) => (
                         <div
                           key={'m-t-' + t.id}
-                          className="text-[9px] font-semibold px-1.5 py-0.5 rounded text-white truncate"
+                          className="text-[9px] font-extrabold px-2 py-0.5 rounded-lg text-white truncate shadow-2xs"
                           style={{ backgroundColor: t.color || '#5B8DEF' }}
                         >
                           {t.title}
                         </div>
                       ))}
                       {totalCount > 2 && (
-                        <div className="text-[9px] text-app-muted font-bold pl-1">
-                          +{totalCount - 2} daha...
+                        <div className="text-[9px] text-app-accent font-extrabold pl-1">
+                          +{totalCount - 2} plan daha...
                         </div>
                       )}
                     </div>
@@ -649,32 +668,44 @@ export default function CalendarView() {
         )}
       </div>
 
-      {/* Item Detail / Delete Modal */}
+      {/* Premium Item Detail / Delete Modal */}
       {selectedTaskDetail && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-app-surface border border-app rounded-2xl w-full max-w-sm p-5 shadow-xl space-y-4">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-app-surface border border-app rounded-3xl w-full max-w-sm p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in duration-200">
             <div className="flex items-center justify-between border-b border-app pb-3">
-              <h3 className="font-bold text-sm text-app-primary flex items-center gap-2">
-                <Clock className="w-4 h-4 text-app-accent" /> {selectedTaskDetail.title}
+              <h3 className="font-extrabold text-base text-app-primary flex items-center gap-2 truncate pr-2">
+                <Clock className="w-4 h-4 text-app-accent shrink-0" /> {selectedTaskDetail.title}
               </h3>
               {selectedTaskDetail.recurrence_group_id && (
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-app-accent-light text-app-accent flex items-center gap-1">
+                <span className="text-[10px] font-extrabold px-2.5 py-1 rounded-full bg-app-accent-light text-app-accent border border-app-accent/20 flex items-center gap-1 shrink-0">
                   <Repeat className="w-3 h-3" /> Tekrarlayan
                 </span>
               )}
             </div>
 
-            <div className="text-xs text-app-secondary space-y-1">
-              <p><strong>Tarih:</strong> {selectedTaskDetail.planned_date}</p>
-              <p><strong>Saat:</strong> {selectedTaskDetail.planned_start_time || '10:00'}</p>
-              <p><strong>Süre:</strong> {selectedTaskDetail.estimated_minutes} dakika</p>
-              <p><strong>Kategori:</strong> {selectedTaskDetail.category}</p>
+            <div className="text-xs text-app-secondary space-y-2 bg-app-primary p-3 rounded-2xl border border-app">
+              <p className="flex items-center justify-between">
+                <span className="font-semibold text-app-muted">Tarih:</span>
+                <span className="font-bold text-app-primary">{selectedTaskDetail.planned_date}</span>
+              </p>
+              <p className="flex items-center justify-between">
+                <span className="font-semibold text-app-muted">Saat:</span>
+                <span className="font-bold text-app-primary">{selectedTaskDetail.planned_start_time || '10:00'}</span>
+              </p>
+              <p className="flex items-center justify-between">
+                <span className="font-semibold text-app-muted">Süre:</span>
+                <span className="font-bold text-app-primary">{selectedTaskDetail.estimated_minutes} dakika</span>
+              </p>
+              <p className="flex items-center justify-between">
+                <span className="font-semibold text-app-muted">Kategori:</span>
+                <span className="font-bold text-app-accent bg-app-accent-light px-2 py-0.5 rounded-md">{selectedTaskDetail.category}</span>
+              </p>
             </div>
 
-            <div className="pt-3 border-t border-app space-y-2">
+            <div className="pt-2 space-y-2">
               <button
                 onClick={() => handleDeleteSingleTask(selectedTaskDetail.id)}
-                className="w-full py-2 px-3 rounded-xl border border-rose-500/30 text-rose-500 hover:bg-rose-500/10 font-semibold text-xs transition-all flex items-center justify-center gap-2"
+                className="w-full py-2.5 px-3 rounded-2xl border border-rose-500/30 text-rose-500 hover:bg-rose-500/10 font-bold text-xs transition-all flex items-center justify-center gap-2"
               >
                 <Trash2 className="w-4 h-4" /> Sadece Bu Etkinliği Sil
               </button>
@@ -682,7 +713,7 @@ export default function CalendarView() {
               {selectedTaskDetail.recurrence_group_id && (
                 <button
                   onClick={() => handleDeleteTaskGroup(selectedTaskDetail.recurrence_group_id)}
-                  className="w-full py-2 px-3 rounded-xl bg-rose-500 text-white hover:opacity-90 font-semibold text-xs transition-all flex items-center justify-center gap-2 shadow-xs"
+                  className="w-full py-2.5 px-3 rounded-2xl bg-rose-600 text-white hover:bg-rose-700 font-bold text-xs transition-all flex items-center justify-center gap-2 shadow-sm"
                 >
                   <Repeat className="w-4 h-4" /> Tüm Periyodu (Grubu) Sil
                 </button>
@@ -690,7 +721,7 @@ export default function CalendarView() {
 
               <button
                 onClick={() => setSelectedTaskDetail(null)}
-                className="w-full py-2 px-3 rounded-xl border border-app text-app-secondary text-xs"
+                className="w-full py-2.5 px-3 rounded-2xl border border-app text-app-secondary font-bold text-xs hover:bg-app-secondary transition-colors"
               >
                 Kapat
               </button>
@@ -701,53 +732,53 @@ export default function CalendarView() {
 
       {/* Plan / Event Creation Modal */}
       {isPlanModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-app-surface border border-app rounded-2xl w-full max-w-md p-5 shadow-xl space-y-4 max-h-[90vh] overflow-y-auto">
-            <h3 className="font-bold text-base text-app-primary">
-              Yeni Etkinlik / Plan Ekle ({selectedDateStr})
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-app-surface border border-app rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-200">
+            <h3 className="font-extrabold text-base text-app-primary flex items-center gap-2 border-b border-app pb-3">
+              <Sparkles className="w-5 h-5 text-app-accent" /> Yeni Etkinlik / Plan Ekle ({selectedDateStr})
             </h3>
 
-            <form onSubmit={handleCreatePlan} className="space-y-3">
+            <form onSubmit={handleCreatePlan} className="space-y-3.5">
               <div>
-                <label className="block text-xs font-semibold text-app-secondary mb-1">Başlık *</label>
+                <label className="block text-xs font-bold text-app-secondary mb-1">Başlık *</label>
                 <input
                   type="text"
                   required
                   value={planTitle}
                   onChange={(e) => setPlanTitle(e.target.value)}
                   placeholder="Örn: Müşteri Görüşmesi veya Daily Standup"
-                  className="w-full px-3 py-2 rounded-xl border border-app bg-app-primary text-app-primary text-xs focus:outline-none focus:ring-1 focus:ring-app-accent"
+                  className="w-full px-3.5 py-2.5 rounded-2xl border border-app bg-app-primary text-app-primary text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-app-accent/50"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-app-secondary mb-1">Başlangıç Saati</label>
+                  <label className="block text-xs font-bold text-app-secondary mb-1">Başlangıç Saati</label>
                   <input
                     type="time"
                     value={planTime}
                     onChange={(e) => setPlanTime(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-app bg-app-primary text-app-primary text-xs focus:outline-none focus:ring-1 focus:ring-app-accent"
+                    className="w-full px-3.5 py-2.5 rounded-2xl border border-app bg-app-primary text-app-primary text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-app-accent/50"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-app-secondary mb-1">Süre (dk)</label>
+                  <label className="block text-xs font-bold text-app-secondary mb-1">Süre (dk)</label>
                   <input
                     type="number"
                     min="15"
                     step="15"
                     value={planDuration}
                     onChange={(e) => setPlanDuration(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-app bg-app-primary text-app-primary text-xs focus:outline-none focus:ring-1 focus:ring-app-accent"
+                    className="w-full px-3.5 py-2.5 rounded-2xl border border-app bg-app-primary text-app-primary text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-app-accent/50"
                   />
                 </div>
               </div>
 
               {/* Recurrence Toggle */}
-              <div className="pt-2 border-t border-app space-y-3">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold text-app-primary flex items-center gap-2">
-                    <Repeat className="w-4 h-4 text-app-accent" /> Periyodik / Tekrarlayan Giriş Yap
+              <div className="pt-3 border-t border-app space-y-3">
+                <div className="flex items-center justify-between p-2.5 rounded-2xl bg-app-primary border border-app">
+                  <label className="text-xs font-bold text-app-primary flex items-center gap-2 cursor-pointer">
+                    <Repeat className="w-4 h-4 text-app-accent" /> Periyodik / Tekrarlayan Giriş
                   </label>
                   <input
                     type="checkbox"
@@ -758,13 +789,13 @@ export default function CalendarView() {
                 </div>
 
                 {isRecurring && (
-                  <div className="p-3 bg-app-secondary rounded-xl space-y-3 border border-app">
+                  <div className="p-3.5 bg-app-primary rounded-2xl space-y-3.5 border border-app shadow-inner">
                     <div>
-                      <label className="block text-[11px] font-semibold text-app-secondary mb-1">Tekrar Düzeni</label>
+                      <label className="block text-[11px] font-bold text-app-secondary mb-1">Tekrar Düzeni</label>
                       <select
                         value={recurrencePattern}
                         onChange={(e) => setRecurrencePattern(e.target.value)}
-                        className="w-full px-2.5 py-1.5 rounded-lg border border-app bg-app-primary text-app-primary text-xs focus:outline-none"
+                        className="w-full px-3 py-2 rounded-xl border border-app bg-app-surface text-app-primary text-xs font-semibold focus:outline-none"
                       >
                         <option value="daily">Her Gün (Daily)</option>
                         <option value="weekdays">Hafta İçi Her Gün (Pzt-Cum)</option>
@@ -774,7 +805,7 @@ export default function CalendarView() {
 
                     {recurrencePattern === 'custom_days' && (
                       <div>
-                        <label className="block text-[11px] font-semibold text-app-secondary mb-1">Günleri Seçin</label>
+                        <label className="block text-[11px] font-bold text-app-secondary mb-1">Günleri Seçin</label>
                         <div className="flex items-center gap-1">
                           {daysOfWeekLabels.map((d) => {
                             const isSelected = selectedDays.includes(d.value);
@@ -783,10 +814,10 @@ export default function CalendarView() {
                                 key={d.value}
                                 type="button"
                                 onClick={() => toggleDaySelection(d.value)}
-                                className={`flex-1 py-1 text-[10px] font-bold rounded-md border transition-all ${
+                                className={`flex-1 py-1.5 text-[10px] font-extrabold rounded-lg border transition-all ${
                                   isSelected
-                                    ? 'bg-app-accent text-white border-app-accent'
-                                    : 'bg-app-primary text-app-muted border-app hover:text-app-primary'
+                                    ? 'bg-app-accent text-white border-app-accent shadow-xs'
+                                    : 'bg-app-surface text-app-muted border-app hover:text-app-primary'
                                 }`}
                               >
                                 {d.label}
@@ -798,11 +829,11 @@ export default function CalendarView() {
                     )}
 
                     <div>
-                      <label className="block text-[11px] font-semibold text-app-secondary mb-1">Ne Kadar Süre Devam Etse?</label>
+                      <label className="block text-[11px] font-bold text-app-secondary mb-1">Ne Kadar Süre Devam Etse?</label>
                       <select
                         value={durationPeriod}
                         onChange={(e) => setDurationPeriod(e.target.value)}
-                        className="w-full px-2.5 py-1.5 rounded-lg border border-app bg-app-primary text-app-primary text-xs focus:outline-none"
+                        className="w-full px-3 py-2 rounded-xl border border-app bg-app-surface text-app-primary text-xs font-semibold focus:outline-none"
                       >
                         <option value="1_month">1 Ay Süresince</option>
                         <option value="3_months">3 Ay Süresince</option>
@@ -818,13 +849,13 @@ export default function CalendarView() {
                 <button
                   type="button"
                   onClick={() => setIsPlanModalOpen(false)}
-                  className="px-4 py-2 rounded-xl border border-app text-app-secondary text-xs"
+                  className="px-4 py-2.5 rounded-2xl border border-app text-app-secondary font-bold text-xs"
                 >
                   İptal
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-xl bg-app-accent text-white font-semibold text-xs hover:opacity-90 shadow-xs"
+                  className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-app-accent to-indigo-600 text-white font-extrabold text-xs hover:opacity-95 shadow-md shadow-app-accent/20"
                 >
                   {isRecurring ? 'Periyodu Planla' : 'Planla'}
                 </button>
