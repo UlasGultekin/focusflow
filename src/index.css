@@ -2,45 +2,66 @@
 
 @layer base {
   :root, [data-theme="light"] {
-    --bg-primary: #FCFAF7;
+    --bg-primary: #F8FAFC;
     --bg-secondary: #F1F5F9;
     --bg-surface: #FFFFFF;
-    --bg-surface-hover: #F8FAFC;
-    --text-primary: #1E293B;
-    --text-secondary: #64748B;
+    --bg-surface-hover: #F1F5F9;
+    --text-primary: #0F172A;
+    --text-secondary: #475569;
     --text-muted: #94A3B8;
     --border-color: #E2E8F0;
-    --accent-color: #5B8DEF;
-    --accent-hover: #4A7BDC;
-    --accent-light: #EEF4FF;
+    --accent-color: #4F46E5;
+    --accent-hover: #4338CA;
+    --accent-light: #EEF2FF;
     --accent-text: #FFFFFF;
     --success-color: #10B981;
     --warning-color: #F59E0B;
     --danger-color: #EF4444;
-    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
-    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07);
-    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
+    --shadow-md: 0 4px 12px -2px rgba(15, 23, 42, 0.06);
+    --shadow-lg: 0 12px 24px -4px rgba(15, 23, 42, 0.08);
   }
 
   [data-theme="dark"] {
-    --bg-primary: #0F172A;
-    --bg-secondary: #1E293B;
-    --bg-surface: #1E293B;
-    --bg-surface-hover: #334155;
-    --text-primary: #F8FAFC;
-    --text-secondary: #94A3B8;
-    --text-muted: #64748B;
-    --border-color: #334155;
-    --accent-color: #A855F7;
-    --accent-hover: #9333EA;
+    --bg-primary: #0B0F19;
+    --bg-secondary: #111827;
+    --bg-surface: #1F2937;
+    --bg-surface-hover: #374151;
+    --text-primary: #F9FAFB;
+    --text-secondary: #9CA3AF;
+    --text-muted: #6B7280;
+    --border-color: #1F2937;
+    --accent-color: #8B5CF6;
+    --accent-hover: #7C3AED;
     --accent-light: #2E1065;
     --accent-text: #FFFFFF;
-    --success-color: #34D399;
-    --warning-color: #FBBF24;
+    --success-color: #10B981;
+    --warning-color: #F59E0B;
     --danger-color: #F87171;
-    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
-    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
-    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 8px 16px -2px rgba(0, 0, 0, 0.5);
+    --shadow-lg: 0 16px 32px -4px rgba(0, 0, 0, 0.6);
+  }
+
+  [data-theme="midnight"] {
+    --bg-primary: #000000;
+    --bg-secondary: #0A0A0A;
+    --bg-surface: #121212;
+    --bg-surface-hover: #1E1E1E;
+    --text-primary: #FFFFFF;
+    --text-secondary: #A1A1AA;
+    --text-muted: #71717A;
+    --border-color: #27272A;
+    --accent-color: #3B82F6;
+    --accent-hover: #2563EB;
+    --accent-light: #1E3A8A;
+    --accent-text: #FFFFFF;
+    --success-color: #10B981;
+    --warning-color: #F59E0B;
+    --danger-color: #EF4444;
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.6);
+    --shadow-md: 0 8px 20px -2px rgba(0, 0, 0, 0.8);
+    --shadow-lg: 0 16px 36px -4px rgba(0, 0, 0, 0.9);
   }
 
   [data-theme="pastel"] {
@@ -48,30 +69,32 @@
     --bg-secondary: #DCFCE7;
     --bg-surface: #FFFFFF;
     --bg-surface-hover: #F0FDF4;
-    --text-primary: #1C1917;
-    --text-secondary: #78716C;
-    --text-muted: #A8A29E;
+    --text-primary: #14532D;
+    --text-secondary: #166534;
+    --text-muted: #86EFAC;
     --border-color: #BBF7D0;
-    --accent-color: #FB7185;
-    --accent-hover: #F43F5E;
-    --accent-light: #FFF1F2;
+    --accent-color: #059669;
+    --accent-hover: #047857;
+    --accent-light: #ECFDF5;
     --accent-text: #FFFFFF;
-    --success-color: #22C55E;
+    --success-color: #10B981;
     --warning-color: #F59E0B;
     --danger-color: #F43F5E;
     --shadow-sm: 0 1px 3px rgba(187, 247, 208, 0.2);
-    --shadow-md: 0 4px 6px -1px rgba(187, 247, 208, 0.3);
-    --shadow-lg: 0 10px 15px -3px rgba(187, 247, 208, 0.4);
+    --shadow-md: 0 4px 12px -1px rgba(34, 197, 94, 0.12);
+    --shadow-lg: 0 10px 20px -3px rgba(34, 197, 94, 0.2);
   }
 
   body {
     background-color: var(--bg-primary);
     color: var(--text-primary);
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     margin: 0;
     padding: 0;
     user-select: none;
     overflow: hidden;
+    letter-spacing: -0.01em;
+    transition: background-color 0.25s ease, color 0.25s ease;
   }
 }
 

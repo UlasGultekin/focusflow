@@ -376,8 +376,8 @@ export default function BugsView() {
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-app-surface w-full max-w-lg rounded-2xl border border-app shadow-2xl p-6" onDrop={handleDrop} onDragOver={e => e.preventDefault()}>
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-app-surface w-full max-w-2xl rounded-3xl border border-app shadow-2xl p-6 max-h-[92vh] overflow-y-auto" onDrop={handleDrop} onDragOver={e => e.preventDefault()}>
             <h2 className="text-lg font-bold mb-4">{editingBug ? 'Bug Düzenle' : 'Yeni Bug Bildir'}</h2>
             <form onSubmit={handleSaveBug} className="space-y-4">
               <div>
@@ -386,7 +386,7 @@ export default function BugsView() {
               </div>
               <div>
                 <label className="block text-xs font-semibold text-app-secondary mb-1">Açıklama (Resim kopyala-yapıştır yapabilirsiniz)</label>
-                <textarea onPaste={handlePaste} value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className="w-full bg-app-bg border border-app rounded-xl px-3 py-2 text-sm outline-hidden focus:border-rose-500" />
+                <textarea onPaste={handlePaste} value={description} onChange={(e) => setDescription(e.target.value)} rows={4} className="w-full bg-app-bg border border-app rounded-xl px-3 py-2 text-sm outline-hidden focus:border-rose-500" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>

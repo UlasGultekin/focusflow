@@ -62,10 +62,10 @@ export default function TaskModal({ isOpen, onClose, taskToEdit = null }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-app-surface border border-app rounded-2xl w-full max-w-lg shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-app-surface border border-app rounded-3xl w-full max-w-xl shadow-2xl max-h-[92vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
         {/* Modal Header */}
-        <div className="flex items-center justify-between p-4 border-b border-app">
+        <div className="flex items-center justify-between p-5 border-b border-app">
           <h2 className="font-bold text-lg text-app-primary">
             {taskToEdit ? 'Görevi Düzenle' : 'Yeni Görev Ekle'}
           </h2>
@@ -89,7 +89,7 @@ export default function TaskModal({ isOpen, onClose, taskToEdit = null }) {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Örn: Sunum slaytlarını hazırla"
-              className="w-full px-3.5 py-2 rounded-xl border border-app bg-app-primary text-app-primary focus:outline-none focus:ring-2 focus:ring-app-accent text-sm"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-app bg-app-primary text-app-primary focus:outline-none focus:ring-2 focus:ring-app-accent text-sm"
             />
           </div>
 
@@ -98,11 +98,11 @@ export default function TaskModal({ isOpen, onClose, taskToEdit = null }) {
               Açıklama / Detaylar
             </label>
             <textarea
-              rows="3"
+              rows="5"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Görev hakkında ek notlar..."
-              className="w-full px-3.5 py-2 rounded-xl border border-app bg-app-primary text-app-primary focus:outline-none focus:ring-2 focus:ring-app-accent text-sm resize-none"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-app bg-app-primary text-app-primary focus:outline-none focus:ring-2 focus:ring-app-accent text-sm"
             />
           </div>
 

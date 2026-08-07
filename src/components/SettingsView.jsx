@@ -210,47 +210,61 @@ export default function SettingsView() {
             <Sparkles className="w-4 h-4 text-app-accent" /> Tema & Görünüm Modları
           </h3>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {/* Soft Light */}
             <button
               onClick={() => setTheme('light')}
-              className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${
+              className={`p-3.5 rounded-xl border flex flex-col items-center gap-1.5 transition-all ${
                 theme === 'light'
-                  ? 'border-app-accent bg-app-accent-light/40 shadow-xs'
+                  ? 'border-indigo-600 bg-indigo-50/50 dark:bg-indigo-950/20 ring-2 ring-indigo-500/20 shadow-xs'
                   : 'border-app hover:bg-app-surface-hover'
               }`}
             >
-              <Sun className="w-6 h-6 text-blue-500" />
-              <span className="text-xs font-bold text-app-primary">Açık (Soft Light)</span>
-              <span className="text-[10px] text-app-muted text-center">Yumuşak beyaz/mavi tonlar</span>
+              <Sun className="w-5 h-5 text-indigo-600" />
+              <span className="text-xs font-bold text-app-primary">Açık (Indigo)</span>
+              <span className="text-[10px] text-app-muted text-center leading-tight">Yumuşak indigo & beyaz</span>
             </button>
 
             {/* Deep Dark */}
             <button
               onClick={() => setTheme('dark')}
-              className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${
+              className={`p-3.5 rounded-xl border flex flex-col items-center gap-1.5 transition-all ${
                 theme === 'dark'
-                  ? 'border-app-accent bg-app-accent-light/40 shadow-xs'
+                  ? 'border-purple-500 bg-purple-950/30 ring-2 ring-purple-500/20 shadow-xs'
                   : 'border-app hover:bg-app-surface-hover'
               }`}
             >
-              <Moon className="w-6 h-6 text-purple-500" />
+              <Moon className="w-5 h-5 text-purple-400" />
               <span className="text-xs font-bold text-app-primary">Koyu (Deep Dark)</span>
-              <span className="text-[10px] text-app-muted text-center">Gece mavisi & neon mor</span>
+              <span className="text-[10px] text-app-muted text-center leading-tight">Gece mavisi & mor</span>
             </button>
 
-            {/* Pastel Calm */}
+            {/* OLED Midnight */}
             <button
-              onClick={() => setTheme('pastel')}
-              className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${
-                theme === 'pastel'
-                  ? 'border-app-accent bg-app-accent-light/40 shadow-xs'
+              onClick={() => setTheme('midnight')}
+              className={`p-3.5 rounded-xl border flex flex-col items-center gap-1.5 transition-all ${
+                theme === 'midnight'
+                  ? 'border-blue-500 bg-blue-950/30 ring-2 ring-blue-500/20 shadow-xs'
                   : 'border-app hover:bg-app-surface-hover'
               }`}
             >
-              <Sparkles className="w-6 h-6 text-rose-500" />
-              <span className="text-xs font-bold text-app-primary">Pastel (Calm)</span>
-              <span className="text-[10px] text-app-muted text-center">Nane yeşili & mercan</span>
+              <Moon className="w-5 h-5 text-sky-400" />
+              <span className="text-xs font-bold text-app-primary">OLED Midnight</span>
+              <span className="text-[10px] text-app-muted text-center leading-tight">Zifiri siyah & neon mavi</span>
+            </button>
+
+            {/* Pastel Emerald */}
+            <button
+              onClick={() => setTheme('pastel')}
+              className={`p-3.5 rounded-xl border flex flex-col items-center gap-1.5 transition-all ${
+                theme === 'pastel'
+                  ? 'border-emerald-600 bg-emerald-50/50 ring-2 ring-emerald-500/20 shadow-xs'
+                  : 'border-app hover:bg-app-surface-hover'
+              }`}
+            >
+              <Sparkles className="w-5 h-5 text-emerald-600" />
+              <span className="text-xs font-bold text-app-primary">Pastel (Emerald)</span>
+              <span className="text-[10px] text-app-muted text-center leading-tight">Zümrüt yeşili & nane</span>
             </button>
           </div>
 

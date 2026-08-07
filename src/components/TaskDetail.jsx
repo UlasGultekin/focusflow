@@ -1199,7 +1199,7 @@ export default function TaskDetail({ onEditTask, onShareTask }) {
       {/* Hızlı Not Ekle Modalı */}
       {isQuickNoteOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-app-surface border border-app rounded-3xl w-full max-w-2xl p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in duration-200">
+          <div className="bg-app-surface border border-app rounded-3xl w-full max-w-3xl p-6 shadow-2xl space-y-5 max-h-[92vh] overflow-y-auto animate-in fade-in zoom-in duration-200">
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-app pb-4">
               <div className="flex items-center gap-3">
@@ -1319,7 +1319,7 @@ export default function TaskDetail({ onEditTask, onShareTask }) {
                   </div>
                 </div>
                 <textarea
-                  rows={8}
+                  rows={12}
                   required
                   value={quickNoteContent}
                   onPaste={handleQuickNotePaste}
