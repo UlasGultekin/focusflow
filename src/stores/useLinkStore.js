@@ -48,10 +48,28 @@ export const useLinkStore = create((set, get) => ({
     }
   },
 
-  openExternalLink: (url) => {
-    if (window.electronAPI && url) {
-      const validUrl = url.startsWith('http://') || url.startsWith('https://') ? url : `https://${url}`;
-      window.electronAPI.openExternal(validUrl);
+  openExternalLink: async (url) => {
+    if (!window.electronAPI || !url) return;
+    const trimmed = url.trim();
+    // Check if it's a web URL (http:// or https://)
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      window.electronAPI.openExternal(trimmed);
+    } else if (trimmed.includes('://')) {
+      // Custom web scheme
+      window.electronAPI.openExternal(trimmed);
+    } else {
+      // Local path (file or folder, e.g. D:\Projects or C:\Users\...)
+      if (window.electronAPI.openPath) {
+        const res = await window.electronAPI.openPath(trimmed);
+        if (!res?.success) {
+          // Fallback to web external if openPath failed or if user omitted http://
+          const webUrl = `https://${trimmed}`;
+          window.electronAPI.openExternal(webUrl);
+        }
+      } else {
+        const webUrl = `https://${trimmed}`;
+        window.electronAPI.openExternal(webUrl);
+      }
     }
   },
 }));

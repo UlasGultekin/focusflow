@@ -50,7 +50,7 @@ export default function DashboardView({ onNavigate }) {
   // Filters State
   const [filterType, setFilterType] = useState('all'); // 'all' | 'tasks' | 'bugs' | 'tech_debts' | 'notes' | 'links'
   const [filterStatus, setFilterStatus] = useState('all'); // 'all' | 'active' | 'completed'
-  const [dateRangeType, setDateRangeType] = useState('all'); // 'all' | 'today' | 'this_week' | 'this_month' | 'custom' | 'single'
+  const [dateRangeType, setDateRangeType] = useState('today_and_yesterday'); // Default: Bugün ve Dün
   const [singleDate, setSingleDate] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -69,16 +69,28 @@ export default function DashboardView({ onNavigate }) {
     if (dateRangeType === 'all') return true;
     if (!itemDateStr) return false;
 
-    const targetDate = parseISO(itemDateStr.slice(0, 10));
+    const itemDate = itemDateStr.slice(0, 10);
+    const targetDate = parseISO(itemDate);
     const now = new Date();
+    const todayStr = format(now, 'yyyy-MM-dd');
+    const yesterdayDate = new Date(now);
+    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+    const yesterdayStr = format(yesterdayDate, 'yyyy-MM-dd');
 
-    if (dateRangeType === 'single') {
-      return singleDate ? itemDateStr.slice(0, 10) === singleDate : true;
+    if (dateRangeType === 'today_and_yesterday') {
+      return itemDate === todayStr || itemDate === yesterdayStr;
     }
 
     if (dateRangeType === 'today') {
-      const todayStr = format(now, 'yyyy-MM-dd');
-      return itemDateStr.slice(0, 10) === todayStr;
+      return itemDate === todayStr;
+    }
+
+    if (dateRangeType === 'yesterday') {
+      return itemDate === yesterdayStr;
+    }
+
+    if (dateRangeType === 'single') {
+      return singleDate ? itemDate === singleDate : true;
     }
 
     if (dateRangeType === 'this_week') {
@@ -99,8 +111,8 @@ export default function DashboardView({ onNavigate }) {
           end: endOfDay(parseISO(endDate)),
         });
       }
-      if (startDate) return itemDateStr.slice(0, 10) >= startDate;
-      if (endDate) return itemDateStr.slice(0, 10) <= endDate;
+      if (startDate) return itemDate >= startDate;
+      if (endDate) return itemDate <= endDate;
     }
 
     return true;
@@ -316,11 +328,13 @@ export default function DashboardView({ onNavigate }) {
                 onChange={(e) => setDateRangeType(e.target.value)}
                 className="w-full px-4 py-2.5 rounded-2xl border border-app bg-app-primary text-app-primary text-xs font-bold focus:outline-none focus:ring-2 focus:ring-app-accent/40 cursor-pointer shadow-xs"
               >
-                <option value="all">📅 Tüm Zamanlar</option>
-                <option value="single">📌 Belirli Bir Gün Seç</option>
-                <option value="today">☀️ Bugün</option>
+                <option value="today_and_yesterday">⚡ Bugün ve Bir Önceki Gün (Varsayılan)</option>
+                <option value="today">☀️ Sadece Bugün</option>
+                <option value="yesterday">🕒 Sadece Dün (Bir Önceki Gün)</option>
                 <option value="this_week">🗓 Bu Hafta</option>
                 <option value="this_month">📆 Bu Ay</option>
+                <option value="all">📅 Tüm Zamanlar</option>
+                <option value="single">📌 Belirli Bir Gün Seç</option>
                 <option value="custom">🔍 Özel Tarih Aralığı</option>
               </select>
             </div>
