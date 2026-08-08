@@ -22,12 +22,32 @@ import CommandPaletteModal from './components/CommandPaletteModal';
 import SessionEndModal from './components/SessionEndModal';
 import YesterdaySummaryToast from './components/YesterdaySummaryToast';
 import TaskShareModal from './components/TaskShareModal';
+import FloatingWidgetView from './components/FloatingWidgetView';
 import { useTaskStore } from './stores/useTaskStore';
 import { useSettingsStore } from './stores/useSettingsStore';
 import { useSearchStore } from './stores/useSearchStore';
 import { useTimerStore } from './stores/useTimerStore';
 
 export default function App() {
+  const [isWidgetMode, setIsWidgetMode] = useState(false);
+  const [widgetData, setWidgetData] = useState(null);
+
+  useEffect(() => {
+    // Check if loaded in floating widget mode (#widget?data=...)
+    if (window.location.hash.startsWith('#widget')) {
+      setIsWidgetMode(true);
+      try {
+        const hashQuery = window.location.hash.split('?data=')[1];
+        if (hashQuery) {
+          const parsed = JSON.parse(decodeURIComponent(hashQuery));
+          setWidgetData(parsed);
+        }
+      } catch (err) {
+        console.error('Widget verisi okunamadı:', err);
+      }
+    }
+  }, []);
+
   const [currentTab, setCurrentTab] = useState('dashboard');
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [isStandupModalOpen, setIsStandupModalOpen] = useState(false);
@@ -75,6 +95,10 @@ export default function App() {
       window.removeEventListener('keydown', handleGlobalShortcuts);
     };
   }, []);
+
+  if (isWidgetMode) {
+    return <FloatingWidgetView initialData={widgetData} />;
+  }
 
   const handleOpenAddModal = () => {
     setTaskToEdit(null);

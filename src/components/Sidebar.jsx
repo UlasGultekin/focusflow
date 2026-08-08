@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   LayoutList, Kanban, Calendar, GraduationCap, Flame, BookHeart,
   NotebookPen, BarChart3, Search, Settings, Sparkles, Moon, Sun,
-  Pencil, Check, X, RotateCcw, Link2, Bug, Wrench, LayoutDashboard,
+  Pencil, Check, X, RotateCcw, Link2, Bug, Wrench, LayoutDashboard, Pin,
 } from 'lucide-react';
 import { useSettingsStore, DEFAULT_MENU_LABELS } from '../stores/useSettingsStore';
 
@@ -12,6 +12,15 @@ export default function Sidebar({ currentTab, setCurrentTab, onOpenStandup }) {
   const [editingId, setEditingId] = useState(null);
   const [editingValue, setEditingValue] = useState('');
   const [isEditMode, setIsEditMode] = useState(false);
+  const [isAlwaysOnTop, setIsAlwaysOnTop] = useState(false);
+
+  const togglePin = async () => {
+    if (window.electronAPI?.toggleAlwaysOnTop) {
+      const nextState = !isAlwaysOnTop;
+      const res = await window.electronAPI.toggleAlwaysOnTop(nextState);
+      setIsAlwaysOnTop(res);
+    }
+  };
 
   const menuItems = [
     { id: 'dashboard', icon: LayoutDashboard },
@@ -56,16 +65,29 @@ export default function Sidebar({ currentTab, setCurrentTab, onOpenStandup }) {
   return (
     <aside className={`flex flex-col border-r border-app bg-app-surface transition-all duration-200 ${compactMode ? 'w-16' : 'w-60'} h-screen select-none`}>
       {/* Brand Header */}
-      <div className="flex items-center gap-3 p-4 border-b border-app">
-        <div className="w-9 h-9 rounded-xl bg-app-accent flex items-center justify-center text-white shadow-md shrink-0">
-          <Sparkles className="w-5 h-5" />
-        </div>
-        {!compactMode && (
-          <div className="flex-1 min-w-0">
-            <h1 className="font-bold text-lg leading-none text-app-primary">FocusFlow</h1>
-            <span className="text-xs text-app-muted font-medium">Masaüstü Odaklık</span>
+      <div className="flex items-center justify-between p-4 border-b border-app">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-9 h-9 rounded-xl bg-app-accent flex items-center justify-center text-white shadow-md shrink-0">
+            <Sparkles className="w-5 h-5" />
           </div>
-        )}
+          {!compactMode && (
+            <div className="flex-1 min-w-0">
+              <h1 className="font-bold text-lg leading-none text-app-primary">FocusFlow</h1>
+              <span className="text-xs text-app-muted font-medium">Masaüstü Odaklık</span>
+            </div>
+          )}
+        </div>
+        <button
+          onClick={togglePin}
+          className={`p-2 rounded-xl transition-all ${
+            isAlwaysOnTop
+              ? 'bg-amber-500 text-white shadow-xs'
+              : 'text-app-muted hover:text-app-primary hover:bg-app-surface-hover'
+          }`}
+          title={isAlwaysOnTop ? 'Üstte Sabitlemeyi Kaldır (Pin Unfix)' : 'Pencereyi Tüm Ekranların Üstüne Sabitle (Always On Top)'}
+        >
+          <Pin className={`w-4 h-4 ${isAlwaysOnTop ? 'fill-current' : ''}`} />
+        </button>
       </div>
 
       {/* Edit Mode Toggle */}

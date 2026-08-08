@@ -27,6 +27,8 @@ import {
   NotebookPen,
   ImageIcon,
   Eye,
+  Edit3,
+  Pin,
 } from 'lucide-react';
 import { useTaskStore } from '../stores/useTaskStore';
 
@@ -568,6 +570,17 @@ export default function TaskDetail({ onEditTask, onShareTask }) {
             title="Bu Görev İçin Zengin Not Şablonu Oluştur"
           >
             <NotebookPen className="w-4 h-4" /> Hızlı Not Ekle
+          </button>
+          <button
+            onClick={async () => {
+              if (window.electronAPI?.openWidget) {
+                await window.electronAPI.openWidget('task', task);
+              }
+            }}
+            className="p-2 rounded-xl border border-app text-app-secondary hover:text-amber-500 hover:bg-amber-500/10 transition-colors"
+            title="Bu Görevi Masaüstüne Sabitle (Floating Desktop Widget)"
+          >
+            <Pin className="w-4 h-4" />
           </button>
           <button
             onClick={() => onShareTask && onShareTask(task)}

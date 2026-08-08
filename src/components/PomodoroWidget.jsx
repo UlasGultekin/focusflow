@@ -1,9 +1,20 @@
-import React from 'react';
-import { Play, Pause, RotateCcw, SkipForward, Coffee, Flame, MoonStar } from 'lucide-react';
+import React, { useState } from 'react';
+import { Play, Pause, RotateCcw, SkipForward, Coffee, Flame, MoonStar, Pin } from 'lucide-react';
 import { useTimerStore } from '../stores/useTimerStore';
 import { useTaskStore } from '../stores/useTaskStore';
 
 export default function PomodoroWidget() {
+  const [isAlwaysOnTop, setIsAlwaysOnTop] = useState(false);
+
+  const togglePin = async () => {
+    if (window.electronAPI?.openWidget) {
+      await window.electronAPI.openWidget('pomodoro', null);
+    } else if (window.electronAPI?.toggleAlwaysOnTop) {
+      const nextState = !isAlwaysOnTop;
+      const res = await window.electronAPI.toggleAlwaysOnTop(nextState);
+      setIsAlwaysOnTop(res);
+    }
+  };
   const {
     mode,
     status,
@@ -154,6 +165,18 @@ export default function PomodoroWidget() {
             title="Sonraki Aşamaya Atla"
           >
             <SkipForward className="w-3.5 h-3.5" />
+          </button>
+
+          <button
+            onClick={togglePin}
+            className={`p-1.5 rounded-lg border transition-all ${
+              isAlwaysOnTop
+                ? 'bg-amber-500 text-white border-amber-500 shadow-xs'
+                : 'border-app text-app-secondary hover:bg-app-surface-hover hover:text-app-primary'
+            }`}
+            title={isAlwaysOnTop ? 'Üstte Sabitlemeyi Kaldır' : 'Pencereyi Her Zaman Üstte Tut (Always On Top)'}
+          >
+            <Pin className={`w-3.5 h-3.5 ${isAlwaysOnTop ? 'fill-current' : ''}`} />
           </button>
 
           <div className="ml-auto text-xs font-semibold text-app-muted flex items-center gap-1">

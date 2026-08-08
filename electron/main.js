@@ -467,6 +467,47 @@ function setupIPCHandlers() {
       mainWindow?.focus();
     }
   });
+  ipcMain.handle('window:setAlwaysOnTop', (_, flag) => {
+    if (mainWindow) {
+      const state = Boolean(flag);
+      mainWindow.setAlwaysOnTop(state, 'floating');
+      return mainWindow.isAlwaysOnTop();
+    }
+    return false;
+  });
+  ipcMain.handle('window:openWidget', (_, type, data) => {
+    try {
+      const widgetWindow = new BrowserWindow({
+        width: 340,
+        height: 480,
+        alwaysOnTop: true,
+        frame: false,
+        transparent: true,
+        resizable: true,
+        skipTaskbar: false,
+        webPreferences: {
+          preload: path.join(__dirname, 'preload.js'),
+          contextIsolation: true,
+          nodeIntegration: false,
+        },
+      });
+
+      const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+      const widgetParam = encodeURIComponent(JSON.stringify({ type, data }));
+
+      if (isDev) {
+        widgetWindow.loadURL(`http://localhost:5173/#widget?data=${widgetParam}`);
+      } else {
+        widgetWindow.loadFile(path.join(__dirname, '../dist/index.html'), {
+          hash: `widget?data=${widgetParam}`,
+        });
+      }
+      return { success: true };
+    } catch (err) {
+      console.error('Widget penceresi açılamadı:', err);
+      return { success: false, error: err.message };
+    }
+  });
 }
 
 // ── Calendar Event Notification Scheduler ──────────────────────────────────

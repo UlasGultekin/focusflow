@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   NotebookPen, Plus, Trash2, Edit3, Calendar, Search,
-  Filter, Image as ImageIcon, X, ZoomIn, Clipboard, StickyNote, Sparkles, Check, Paperclip, Folder, File, CalendarClock
+  Filter, Image as ImageIcon, X, ZoomIn, Clipboard, StickyNote, Sparkles, Check, Paperclip, Folder, File, CalendarClock, Pin
 } from 'lucide-react';
 import { useTaskStore } from '../stores/useTaskStore';
 import { format } from 'date-fns';
@@ -197,6 +197,19 @@ function NoteCard({ note, onEdit, onDelete, onOpenImage, onPlan }) {
             {dateStr}
           </span>
           <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button
+              onClick={async () => {
+                if (window.electronAPI?.openWidget) {
+                  await window.electronAPI.openWidget('note', note);
+                } else if (window.electronAPI?.toggleAlwaysOnTop) {
+                  await window.electronAPI.toggleAlwaysOnTop(true);
+                }
+              }}
+              className="p-1.5 rounded-lg border border-transparent hover:border-amber-500/30 hover:bg-amber-500/10 text-app-secondary hover:text-amber-500 transition-all flex items-center"
+              title="Bu Notu Masaüstünde Sabitle (Always On Top)"
+            >
+              <Pin size={14} />
+            </button>
             <button
               onClick={() => onEdit(note)}
               className="p-1.5 rounded-lg border border-transparent hover:border-app hover:bg-app-primary text-app-secondary hover:text-app-primary transition-all flex items-center"
