@@ -102,6 +102,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
   deleteTaskLink: (id) => ipcRenderer.invoke('taskLinks:delete', id),
   isTaskBlocked: (taskId) => ipcRenderer.invoke('taskLinks:isBlocked', taskId),
 
+  // Projects & Project Plans
+  getProjects: () => ipcRenderer.invoke('projects:get'),
+  addProject: (data) => ipcRenderer.invoke('projects:add', data),
+  updateProject: (id, data) => ipcRenderer.invoke('projects:update', id, data),
+  deleteProject: (id) => ipcRenderer.invoke('projects:delete', id),
+
+  getProjectPlans: (projectId) => ipcRenderer.invoke('projectPlans:get', projectId),
+  addProjectPlan: (data) => ipcRenderer.invoke('projectPlans:add', data),
+  updateProjectPlan: (id, data) => ipcRenderer.invoke('projectPlans:update', id, data),
+  deleteProjectPlan: (id) => ipcRenderer.invoke('projectPlans:delete', id),
+  convertPlanToTask: (planId) => ipcRenderer.invoke('projectPlans:convertToTask', planId),
+  convertPlanToNote: (planId, customCategory, customPhase, customNotes) => ipcRenderer.invoke('projectPlans:convertToNote', planId, customCategory, customPhase, customNotes),
+
+  // Folder & File Dialogs
+  selectFolder: () => ipcRenderer.invoke('dialog:selectFolder'),
+  selectFiles: () => ipcRenderer.invoke('dialog:selectFiles'),
+
   // Settings
   getSettings: () => ipcRenderer.invoke('settings:get'),
   updateSettings: (settings) => ipcRenderer.invoke('settings:update', settings),

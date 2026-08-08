@@ -13,6 +13,7 @@ const DEFAULT_MENU_LABELS = {
   analytics: 'Analiz & Raporlar',
   settings: 'Ayarlar',
   links: 'Linkler',
+  projects: 'Projeler',
   bugs: 'Hatalar (Bugs)',
   tech_debts: 'Teknik Borçlar',
 };

@@ -46,7 +46,9 @@ export async function initDatabase() {
       planned_date TEXT,
       planned_start_time TEXT,
       task_type TEXT DEFAULT 'task',
-      auto_complete_subtasks INTEGER DEFAULT 0
+      auto_complete_subtasks INTEGER DEFAULT 0,
+      images_json TEXT DEFAULT '[]',
+      attachments_json TEXT DEFAULT '[]'
     );
 
     CREATE TABLE IF NOT EXISTS subtasks (
@@ -225,8 +227,35 @@ export async function initDatabase() {
       FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
       FOREIGN KEY (session_id) REFERENCES task_sessions(id) ON DELETE SET NULL
     );
-    CREATE INDEX IF NOT EXISTS idx_deep_work_task ON deep_work_entries(task_id);
-    CREATE INDEX IF NOT EXISTS idx_deep_work_session ON deep_work_entries(session_id);
+    CREATE TABLE IF NOT EXISTS projects (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      description TEXT,
+      color TEXT DEFAULT '#4F46E5',
+      category TEXT DEFAULT 'Genel',
+      status TEXT DEFAULT 'active',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS project_plans (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      project_id INTEGER NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT,
+      phase TEXT DEFAULT 'Planlama',
+      status TEXT DEFAULT 'todo',
+      sort_order INTEGER DEFAULT 0,
+      images_json TEXT DEFAULT '[]',
+      attachments_json TEXT DEFAULT '[]',
+      converted_task_id INTEGER,
+      converted_note_id INTEGER,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+      FOREIGN KEY (converted_task_id) REFERENCES tasks(id) ON DELETE SET NULL,
+      FOREIGN KEY (converted_note_id) REFERENCES notes(id) ON DELETE SET NULL
+    );
   `);
 
   // Güvenli Migrasyonlar
@@ -254,6 +283,9 @@ export async function initDatabase() {
       }
       if (!columns.includes('images_json')) {
         db.run("ALTER TABLE tasks ADD COLUMN images_json TEXT DEFAULT '[]'");
+      }
+      if (!columns.includes('attachments_json')) {
+        db.run("ALTER TABLE tasks ADD COLUMN attachments_json TEXT DEFAULT '[]'");
       }
     }
 
@@ -300,6 +332,17 @@ export async function initDatabase() {
       }
       if (!bugsCols.includes('project')) {
         db.run("ALTER TABLE bugs ADD COLUMN project TEXT DEFAULT 'Genel'");
+      }
+    }
+
+    const plansInfo = db.exec("PRAGMA table_info(project_plans)");
+    if (plansInfo.length > 0) {
+      const plansCols = plansInfo[0].values.map((col) => col[1]);
+      if (!plansCols.includes('images_json')) {
+        db.run("ALTER TABLE project_plans ADD COLUMN images_json TEXT DEFAULT '[]'");
+      }
+      if (!plansCols.includes('attachments_json')) {
+        db.run("ALTER TABLE project_plans ADD COLUMN attachments_json TEXT DEFAULT '[]'");
       }
     }
 
@@ -1549,4 +1592,198 @@ export function generateStandupReport(dateStr) {
   }
 
   return { yesterday, today, blockers, suggested_text: suggestedText };
+}
+
+// ==========================
+// PROJECTS & PROJECT PLANS
+// ==========================
+export function getProjects() {
+  const res = db.exec(`
+    SELECT p.*,
+      (SELECT COUNT(*) FROM project_plans pp WHERE pp.project_id = p.id) as total_plans,
+      (SELECT COUNT(*) FROM project_plans pp WHERE pp.project_id = p.id AND pp.status = 'done') as completed_plans
+    FROM projects p
+    ORDER BY p.id DESC
+  `);
+  return resultToObjects(res);
+}
+
+export function addProject(data) {
+  const now = new Date().toISOString();
+  db.run(
+    `INSERT INTO projects (title, description, color, category, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [data.title, data.description || '', data.color || '#4F46E5', data.category || 'Genel', 'active', now, now]
+  );
+  const idRes = db.exec(`SELECT last_insert_rowid() as id`);
+  saveDb();
+  return idRes[0]?.values[0][0];
+}
+
+export function updateProject(id, data) {
+  const now = new Date().toISOString();
+  db.run(
+    `UPDATE projects SET title = ?, description = ?, color = ?, category = ?, status = ?, updated_at = ? WHERE id = ?`,
+    [data.title, data.description, data.color, data.category, data.status || 'active', now, id]
+  );
+  saveDb();
+  return true;
+}
+
+export function deleteProject(id) {
+  db.run(`DELETE FROM projects WHERE id = ?`, [id]);
+  db.run(`DELETE FROM project_plans WHERE project_id = ?`, [id]);
+  saveDb();
+  return true;
+}
+
+export function getProjectPlans(projectId) {
+  const res = db.exec(`
+    SELECT pp.*, t.title as converted_task_title, n.content as converted_note_content
+    FROM project_plans pp
+    LEFT JOIN tasks t ON pp.converted_task_id = t.id
+    LEFT JOIN notes n ON pp.converted_note_id = n.id
+    WHERE pp.project_id = ?
+    ORDER BY pp.sort_order ASC, pp.id ASC
+  `, [projectId]);
+  return resultToObjects(res);
+}
+
+export function addProjectPlan(data) {
+  const now = new Date().toISOString();
+  db.run(
+    `INSERT INTO project_plans (project_id, title, description, phase, status, sort_order, images_json, attachments_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      data.project_id,
+      data.title,
+      data.description || '',
+      data.phase || 'Planlama',
+      'todo',
+      data.sort_order || 0,
+      JSON.stringify(data.images || []),
+      JSON.stringify(data.attachments || []),
+      now,
+      now
+    ]
+  );
+  saveDb();
+  return true;
+}
+
+export function updateProjectPlan(id, data) {
+  const now = new Date().toISOString();
+  db.run(
+    `UPDATE project_plans SET title = ?, description = ?, phase = ?, status = ?, sort_order = ?, images_json = ?, attachments_json = ?, updated_at = ? WHERE id = ?`,
+    [
+      data.title,
+      data.description,
+      data.phase,
+      data.status,
+      data.sort_order || 0,
+      JSON.stringify(data.images || []),
+      JSON.stringify(data.attachments || []),
+      now,
+      id
+    ]
+  );
+  saveDb();
+  return true;
+}
+
+export function deleteProjectPlan(id) {
+  db.run(`DELETE FROM project_plans WHERE id = ?`, [id]);
+  saveDb();
+  return true;
+}
+
+export function convertPlanToTask(planId) {
+  const planRes = db.exec(`SELECT * FROM project_plans WHERE id = ?`, [planId]);
+  const plans = resultToObjects(planRes);
+  if (!plans || plans.length === 0) return null;
+
+  const plan = plans[0];
+  const projectRes = db.exec(`SELECT * FROM projects WHERE id = ?`, [plan.project_id]);
+  const projects = resultToObjects(projectRes);
+  const project = projects[0];
+
+  const now = new Date().toISOString();
+  // Create Task carrying plan's images and attachments
+  db.run(
+    `INSERT INTO tasks (title, description, category, color, images_json, attachments_json, created_at, updated_at, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      `[${project ? project.title : 'Proje'}] ${plan.title}`,
+      plan.description || '',
+      project ? project.category || 'Proje' : 'Proje',
+      project ? project.color || '#4F46E5' : '#4F46E5',
+      plan.images_json || '[]',
+      plan.attachments_json || '[]',
+      now,
+      now,
+      'todo'
+    ]
+  );
+
+  const taskIdRes = db.exec(`SELECT last_insert_rowid() as id`);
+  const taskId = taskIdRes[0]?.values[0][0];
+
+  // Transfer attachments to task_attachments table for dual compatibility
+  try {
+    const atts = JSON.parse(plan.attachments_json || '[]');
+    if (Array.isArray(atts)) {
+      atts.forEach((att) => {
+        db.run(
+          `INSERT INTO task_attachments (task_id, name, path, type, created_at) VALUES (?, ?, ?, ?, ?)`,
+          [taskId, att.name, att.path, att.type || 'file', now]
+        );
+      });
+    }
+  } catch (e) {}
+
+  // Update Plan with converted_task_id
+  db.run(`UPDATE project_plans SET converted_task_id = ?, updated_at = ? WHERE id = ?`, [taskId, now, planId]);
+  saveDb();
+
+  return taskId;
+}
+
+export function convertPlanToNote(planId, customCategory, customPhase, customNotes) {
+  const planRes = db.exec(`SELECT * FROM project_plans WHERE id = ?`, [planId]);
+  const plans = resultToObjects(planRes);
+  if (!plans || plans.length === 0) return null;
+
+  const plan = plans[0];
+  const projectRes = db.exec(`SELECT * FROM projects WHERE id = ?`, [plan.project_id]);
+  const projects = resultToObjects(projectRes);
+  const project = projects[0];
+
+  const now = new Date().toISOString();
+  const categoryToUse = customCategory || (project ? project.category || 'Proje' : 'Proje');
+  const phaseToUse = customPhase || plan.phase || 'Planlama';
+
+  let noteContent = `📌 Proje Plan Notu: ${plan.title}\n📁 Proje: ${project ? project.title : 'Genel'}\n📍 Aşama: ${phaseToUse}\n\n${plan.description || ''}`;
+
+  if (customNotes && customNotes.trim()) {
+    noteContent += `\n\n📝 Ek Notlar & Açıklamalar:\n${customNotes.trim()}`;
+  }
+
+  // Create Note carrying plan's images and attachments
+  db.run(
+    `INSERT INTO notes (content, category, images_json, attachments_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`,
+    [
+      noteContent,
+      categoryToUse,
+      plan.images_json || '[]',
+      plan.attachments_json || '[]',
+      now,
+      now
+    ]
+  );
+
+  const noteIdRes = db.exec(`SELECT last_insert_rowid() as id`);
+  const noteId = noteIdRes[0]?.values[0][0];
+
+  // Update Plan with converted_note_id
+  db.run(`UPDATE project_plans SET converted_note_id = ?, updated_at = ? WHERE id = ?`, [noteId, now, planId]);
+  saveDb();
+
+  return noteId;
 }

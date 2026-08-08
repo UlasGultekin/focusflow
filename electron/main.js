@@ -73,7 +73,17 @@ import {
   addDeepWorkEntry,
   updateDeepWorkEntry,
   deleteDeepWorkEntry,
-  generateStandupReport
+  generateStandupReport,
+  getProjects,
+  addProject,
+  updateProject,
+  deleteProject,
+  getProjectPlans,
+  addProjectPlan,
+  updateProjectPlan,
+  deleteProjectPlan,
+  convertPlanToTask,
+  convertPlanToNote
 } from './database.js';
 
 const { app, BrowserWindow, ipcMain, Tray, Menu, globalShortcut, Notification, dialog, nativeImage, shell } = electron;
@@ -344,6 +354,21 @@ function setupIPCHandlers() {
     return null;
   });
 
+  ipcMain.handle('dialog:selectFiles', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Dosya Seç',
+      properties: ['openFile', 'multiSelections'],
+    });
+    if (!result.canceled && result.filePaths.length > 0) {
+      return result.filePaths.map((fp) => ({
+        path: fp,
+        name: path.basename(fp),
+        type: 'file',
+      }));
+    }
+    return [];
+  });
+
   ipcMain.handle('attachments:selectFolder', async (_, taskId) => {
     const result = await dialog.showOpenDialog(mainWindow, {
       title: 'Göreve Klasör Bağla',
@@ -371,6 +396,19 @@ function setupIPCHandlers() {
   ipcMain.handle('taskLinks:add', (_, sourceTaskId, targetTaskId, linkType) => addTaskLink(sourceTaskId, targetTaskId, linkType));
   ipcMain.handle('taskLinks:delete', (_, id) => deleteTaskLink(id));
   ipcMain.handle('taskLinks:isBlocked', (_, taskId) => isTaskBlocked(taskId));
+
+  // Projects & Project Plans
+  ipcMain.handle('projects:get', () => getProjects());
+  ipcMain.handle('projects:add', (_, data) => addProject(data));
+  ipcMain.handle('projects:update', (_, id, data) => updateProject(id, data));
+  ipcMain.handle('projects:delete', (_, id) => deleteProject(id));
+
+  ipcMain.handle('projectPlans:get', (_, projectId) => getProjectPlans(projectId));
+  ipcMain.handle('projectPlans:add', (_, data) => addProjectPlan(data));
+  ipcMain.handle('projectPlans:update', (_, id, data) => updateProjectPlan(id, data));
+  ipcMain.handle('projectPlans:delete', (_, id) => deleteProjectPlan(id));
+  ipcMain.handle('projectPlans:convertToTask', (_, planId) => convertPlanToTask(planId));
+  ipcMain.handle('projectPlans:convertToNote', (_, planId, customCategory, customPhase, customNotes) => convertPlanToNote(planId, customCategory, customPhase, customNotes));
 
   // Shell Open External & Open Path
   ipcMain.handle('shell:openExternal', (_, url) => {

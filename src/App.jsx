@@ -5,6 +5,7 @@ import TaskList from './components/TaskList';
 import TaskDetail from './components/TaskDetail';
 import TaskModal from './components/TaskModal';
 import BoardView from './components/BoardView';
+import ProjectsView from './components/ProjectsView';
 import CalendarView from './components/CalendarView';
 import CoursesView from './components/CoursesView';
 import LinksView from './components/LinksView';
@@ -176,6 +177,18 @@ export default function App() {
 
         {currentTab === 'board' && (
           <BoardView onOpenAddModal={handleOpenAddModal} />
+        )}
+
+        {currentTab === 'projects' && (
+          <ProjectsView
+            onNavigateToTask={(taskId) => {
+              selectTask(taskId);
+              setCurrentTab('tasks');
+            }}
+            onNavigateToNote={() => {
+              setCurrentTab('notes');
+            }}
+          />
         )}
 
         {currentTab === 'calendar' && <CalendarView />}

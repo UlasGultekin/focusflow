@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   LayoutList, Kanban, Calendar, GraduationCap, Flame, BookHeart,
   NotebookPen, BarChart3, Search, Settings, Sparkles, Moon, Sun,
-  Pencil, Check, X, RotateCcw, Link2, Bug, Wrench, LayoutDashboard, Pin,
+  Pencil, Check, X, RotateCcw, Link2, Bug, Wrench, LayoutDashboard, Pin, FolderKanban,
 } from 'lucide-react';
 import { useSettingsStore, DEFAULT_MENU_LABELS } from '../stores/useSettingsStore';
 
@@ -26,6 +26,7 @@ export default function Sidebar({ currentTab, setCurrentTab, onOpenStandup }) {
     { id: 'dashboard', icon: LayoutDashboard },
     { id: 'tasks', icon: LayoutList },
     { id: 'board', icon: Kanban },
+    { id: 'projects', icon: FolderKanban },
     { id: 'calendar', icon: Calendar },
     { id: 'courses', icon: GraduationCap },
     { id: 'links', icon: Link2 },
